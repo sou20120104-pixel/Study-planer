@@ -176,6 +176,12 @@ dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color:
 .cal .m { color: var(--muted); font-family: var(--hand); line-height: 1.2; margin-top: auto; }
 .cal .bar { height: 3px; background: var(--lead); opacity: .55; }
 
+.cal .p { font-size: 10px; line-height: 1.3; color: var(--lead); white-space: nowrap; overflow: hidden; }
+.cal .p.done { color: var(--muted); }
+.ts-row { border-bottom: 1px dashed var(--rule); padding-bottom: 6px; margin-bottom: 8px; }
+.rg { display: grid; grid-template-columns: 1fr 1fr 30px; gap: 6px; margin: 0 0 6px 12px; }
+.rg select, .rg input { padding: 5px; min-height: 34px; font-size: 13px; }
+.msg-actions { margin-top: 6px; }
 /* 小テスト */
 .q { padding: 12px 0; border-bottom: 1px dashed var(--rule); position: relative; }
 .q:last-child { border-bottom: 0; }
@@ -237,6 +243,10 @@ dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color:
         <div class="stat"><b id="statWeek">0分</b><span>直近7日</span></div>
         <div class="stat"><b id="statGoal">-</b><span>目標達成</span></div>
       </div>
+    </div>
+    <div class="card">
+      <h2>今日の予定</h2>
+      <ul class="list" id="homePlans"></ul>
     </div>
     <div class="card">
       <h2>次のテスト</h2>
@@ -338,6 +348,7 @@ dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color:
         <label class="f grow"><span>教科</span><select id="qzSubject"></select></label>
         <label class="f grow"><span>教材（任意）</span><select id="qzBook"></select></label>
       </div>
+      <label class="f" id="qzFromWrap"><span>テスト範囲から選ぶ（任意）</span><select id="qzFrom"></select></label>
       <label class="f"><span>範囲・テーマ</span><input id="qzTopic" placeholder="例: 二次関数の最大・最小、関係代名詞"></label>
       <div class="row">
         <label class="f grow"><span>問題数</span><select id="qzCount"><option>3</option><option selected>5</option><option>10</option></select></label>
@@ -483,6 +494,17 @@ dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color:
   </div>
 </dialog>
 
+<!-- 予定の登録 -->
+<dialog id="dlgPlan">
+  <h3>カレンダーに登録する予定</h3>
+  <p class="muted" style="margin-top:0">登録しない予定はチェックを外してください。</p>
+  <ul class="list" id="plList"></ul>
+  <div class="dlg-actions">
+    <button id="plCancel">キャンセル</button>
+    <button class="primary" id="plSave">登録する</button>
+  </div>
+</dialog>
+
 <!-- 学習記録 -->
 <dialog id="dlgSession">
   <h3 id="ssTitle">学習を記録</h3>
@@ -524,7 +546,7 @@ dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color:
   <h3>テスト</h3>
   <label class="f"><span>テスト名</span><input id="tsName" placeholder="例: 2学期中間テスト"></label>
   <label class="f"><span>日付</span><input type="date" id="tsDate"></label>
-  <div class="muted" style="margin-bottom:4px">教科ごとの点数（未受験なら空欄、目標点は任意）</div>
+  <div class="muted" style="margin-bottom:4px">教科ごとの点数（未受験なら空欄、目標点は任意）と、テスト範囲の参考書・ページ</div>
   <div class="score-grid muted" style="font-size:12px"><span>教科</span><span>得点</span><span>満点</span><span>目標</span><span></span></div>
   <div id="tsScores"></div>
   <button class="small" id="tsAddRow">＋ 教科を追加</button>
@@ -560,7 +582,7 @@ function lsDel(k) { try { localStorage.removeItem(k); } catch {} }
 function freshState() {
   return {
     subjects: DEFAULT_SUBJECTS.map(([name, color]) => ({ id: uid(), name, color })),
-    books: [], sessions: [], tests: [], quizzes: [],
+    books: [], sessions: [], tests: [], quizzes: [], plans: [],
     timer: null,
     settings: { dailyGoal: 120, aiLength: 'short' }
   };
@@ -645,7 +667,7 @@ function targetLabel(t) {
 function subjectOptions(sel) { return S.subjects.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join(''); }
 
 function render() {
-  renderHome(); renderTimerView(); renderBooks(); renderTests(); renderCalendar(); renderQuizSetup(); renderQuiz(); renderAi(); renderSettings();
+  renderHome(); renderTimerView(); renderBooks(); renderTests(); renderCalendar(); renderQuizSetup(); renderQzFrom(); renderQuiz(); renderAi(); renderSettings();
 }
 
 function renderHome() {
@@ -658,6 +680,8 @@ function renderHome() {
   const goal = Number(S.settings.dailyGoal) || 0;
   $('#statGoal').textContent = goal ? Math.min(999, Math.round(tMin / goal * 100)) + '%' : '-';
 
+  const tp = plansOn(today);
+  $('#homePlans').innerHTML = tp.length ? planItemsHtml(tp) : '<li class="empty">今日の予定はありません。AI相談で計画を作り「カレンダーに登録」すると、ここに表示されます。</li>';
   const upcoming = S.tests.filter(t => t.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
   $('#homeTests').innerHTML = upcoming.length ? upcoming.map(t => {
     const d = daysUntil(t.date);
@@ -723,7 +747,8 @@ function renderBooks() {
   const list = S.books.filter(b => !cur || b.subjectId === cur);
   $('#bookList').innerHTML = list.length ? list.map(b => {
     const m = sumMinutes(x => x.bookId === b.id);
-    return `<li><span class="dot" style="background:${esc(subjColor(b.subjectId))}"></span><div class="grow"><div>${esc(b.title)}</div><div class="muted">${esc(subjName(b.subjectId))}${b.author ? ' ・ ' + esc(b.author) : ''} ・ 累計${fmtMin(m)}</div></div><button class="small primary" data-study-book="${b.id}">学習</button><button class="small" data-edit-book="${b.id}">編集</button></li>`;
+    const tr = testRanges().filter(g => g.bookId === b.id).map(g => `${g.test.name}（${fmtDateJa(g.test.date)}）${g.range ? ' ' + g.range : ''}`);
+    return `<li><span class="dot" style="background:${esc(subjColor(b.subjectId))}"></span><div class="grow"><div>${esc(b.title)}</div><div class="muted">${esc(subjName(b.subjectId))}${b.author ? ' ・ ' + esc(b.author) : ''} ・ 累計${fmtMin(m)}</div>${tr.length ? `<div class="muted" style="color:var(--pen)">テスト範囲：${esc(tr.join('、'))}</div>` : ''}</div><button class="small primary" data-study-book="${b.id}">学習</button><button class="small" data-edit-book="${b.id}">編集</button></li>`;
   }).join('') : '<li class="empty">教材が登録されていません。バーコード読み取りか手入力で追加してください。</li>';
 }
 
@@ -739,7 +764,8 @@ function renderTests() {
     const subj = (t.results || []).map(r => {
       const sc = r.score !== '' && r.score != null ? ` ${r.score}/${r.max || 100}` : '';
       const tg = r.target ? `（目標${r.target}）` : '';
-      return `<span class="tag" style="border-left:3px solid ${esc(subjColor(r.subjectId))}">${esc(subjName(r.subjectId))}${sc}${tg}</span>`;
+      const rg = (r.ranges || []).map(rangeText).filter(Boolean).join('、');
+      return `<span class="tag" style="border-left:3px solid ${esc(subjColor(r.subjectId))}">${esc(subjName(r.subjectId))}${sc}${tg}${rg ? '：' + esc(rg) : ''}</span>`;
     }).join(' ');
     const right = testMode === 'upcoming'
       ? `<span class="countdown${d <= 7 ? ' soon' : ''}">${d === 0 ? '今日' : 'あと' + d + '日'}</span>`
@@ -842,7 +868,7 @@ $('#btnCancel').onclick = () => { if (confirm('計測中の時間を破棄しま
 setInterval(() => { if (S.timer) { updateTimerUi(); if ($('#view-home').classList.contains('active')) { $('#statToday').textContent = fmtMin(sumMinutes(s => s.date === ymd()) + runningMinutes()); } } }, 1000);
 
 /* あとから記録（追加・編集） */
-let editingSession = null, ssMode = 'dur';
+let editingSession = null, ssMode = 'dur', pendingPlanDone = null;
 function setSsMode(m) {
   ssMode = m;
   $$('#ssMode button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
@@ -850,7 +876,7 @@ function setSsMode(m) {
 }
 function openSessionDialog(sess, date) {
   if (!S.subjects.length) return toast('先に教科を追加してください');
-  editingSession = sess || null;
+  editingSession = sess || null; pendingPlanDone = null;
   $('#ssTitle').textContent = sess ? '記録を編集' : '学習を記録';
   $('#ssSave').textContent = sess ? '保存' : '記録する';
   const sel = $('#ssTarget'); sel.innerHTML = bookOptions(false);
@@ -887,6 +913,7 @@ $('#ssSave').onclick = () => {
   if (m > 1440) return toast('24時間を超える記録はできません');
   const data = { ...t, date: d, minutes: m, memo: $('#ssMemo').value.trim() };
   const wasEdit = !!editingSession;
+  if (pendingPlanDone) { const pl = (S.plans || []).find(x => x.id === pendingPlanDone); if (pl) pl.done = true; pendingPlanDone = null; }
   if (wasEdit) Object.assign(editingSession, data);
   else S.sessions.push({ id: uid(), ...data, endedAt: Date.now() });
   save(); $('#dlgSession').close(); render();
@@ -1078,6 +1105,8 @@ $('#bkDelete').onclick = () => {
   if (S.timer && S.timer.bookId === b.id) return toast('計測中の教材は削除できません');
   if (!confirm(`「${b.title}」を削除しますか？（学習記録は教科のみの記録として残ります）`)) return;
   S.sessions.forEach(s => { if (s.bookId === b.id) s.bookId = null; });
+  (S.plans || []).forEach(x => { if (x.bookId === b.id) x.bookId = null; });
+  S.tests.forEach(t => (t.results || []).forEach(r => (r.ranges || []).forEach(g => { if (g.bookId === b.id) g.bookId = null; })));
   S.books = S.books.filter(x => x !== b); save(); $('#dlgBook').close(); render();
 };
 $('#bookFilter').onchange = renderBooks;
@@ -1114,11 +1143,22 @@ document.addEventListener('click', e => { const ed = e.target.closest('[data-edi
 
 /* ========== テストダイアログ ========== */
 let editingTest = null;
-function scoreRow(r = {}) {
-  const div = document.createElement('div'); div.className = 'score-grid';
-  div.innerHTML = `<select>${subjectOptions(r.subjectId)}</select><input type="number" min="0" placeholder="-" value="${esc(r.score ?? '')}"><input type="number" min="1" value="${esc(r.max ?? 100)}"><input type="number" min="0" placeholder="-" value="${esc(r.target ?? '')}"><button class="small danger" aria-label="行を削除">×</button>`;
+function rangeLine(box, subjectId, g = {}) {
+  const div = document.createElement('div'); div.className = 'rg';
+  const books = S.books.filter(b => b.subjectId === subjectId);
+  div.innerHTML = `<select aria-label="参考書"><option value="">参考書（任意）</option>${books.map(b => `<option value="${b.id}" ${b.id === g.bookId ? 'selected' : ''}>${esc(b.title)}</option>`).join('')}</select><input aria-label="範囲" placeholder="範囲 例: p.30-80" value="${esc(g.range ?? '')}"><button class="small danger" aria-label="範囲を削除">×</button>`;
   div.querySelector('button').onclick = () => div.remove();
-  $('#tsScores').appendChild(div);
+  box.appendChild(div);
+}
+function scoreRow(r = {}) {
+  const wrap = document.createElement('div'); wrap.className = 'ts-row';
+  wrap.innerHTML = `<div class="score-grid"><select>${subjectOptions(r.subjectId)}</select><input type="number" min="0" placeholder="-" value="${esc(r.score ?? '')}"><input type="number" min="1" value="${esc(r.max ?? 100)}"><input type="number" min="0" placeholder="-" value="${esc(r.target ?? '')}"><button class="small danger" aria-label="教科を削除">×</button></div><div class="rgs"></div><button class="small" style="margin-left:12px">＋ 範囲</button>`;
+  const sel = wrap.querySelector('select'), rgs = wrap.querySelector('.rgs');
+  wrap.querySelector('.score-grid button').onclick = () => wrap.remove();
+  wrap.querySelector(':scope > button').onclick = () => rangeLine(rgs, sel.value);
+  sel.onchange = () => { const old = [...rgs.children].map(d => ({ range: d.querySelector('input').value })); rgs.innerHTML = ''; (old.length ? old : [{}]).forEach(g => rangeLine(rgs, sel.value, g)); };
+  (r.ranges?.length ? r.ranges : [{}]).forEach(g => rangeLine(rgs, sel.value || r.subjectId, g));
+  $('#tsScores').appendChild(wrap);
 }
 function openTestDialog(t) {
   editingTest = t;
@@ -1136,9 +1176,10 @@ $('#tsCancel').onclick = () => $('#dlgTest').close();
 $('#tsSave').onclick = () => {
   const name = $('#tsName').value.trim(), date = $('#tsDate').value;
   if (!name || !date) return toast('テスト名と日付を入力してください');
-  const results = $$('#tsScores .score-grid').map(row => {
-    const [sel, sc, mx, tg] = row.querySelectorAll('select, input');
-    return { subjectId: sel.value, score: sc.value === '' ? '' : Number(sc.value), max: Number(mx.value) || 100, target: tg.value === '' ? '' : Number(tg.value) };
+  const results = $$('#tsScores .ts-row').map(row => {
+    const [sel, sc, mx, tg] = row.querySelectorAll('.score-grid select, .score-grid input');
+    const ranges = $$('.rg', row).map(d => ({ bookId: d.querySelector('select').value || null, range: d.querySelector('input').value.trim() })).filter(g => g.bookId || g.range);
+    return { subjectId: sel.value, score: sc.value === '' ? '' : Number(sc.value), max: Number(mx.value) || 100, target: tg.value === '' ? '' : Number(tg.value), ranges };
   }).filter(r => r.subjectId);
   const data = { name, date, memo: $('#tsMemo').value.trim(), results };
   if (editingTest) Object.assign(editingTest, data); else S.tests.push({ id: uid(), ...data });
@@ -1168,21 +1209,23 @@ function buildContext() {
     const parts = Object.entries(m).map(([sid, v]) => `${subjName(sid)}${v}`);
     if (parts.length) lines.push(`- ${d}: ${parts.join(', ')}`);
   }
-  const fmtRes = t => (t.results || []).map(r => `${subjName(r.subjectId)}${r.score !== '' && r.score != null ? ` ${r.score}/${r.max}` : ''}${r.target ? `（目標${r.target}）` : ''}`).join(', ');
+  const fmtRes = t => (t.results || []).map(r => `${subjName(r.subjectId)}${r.score !== '' && r.score != null ? ` ${r.score}/${r.max}` : ''}${r.target ? `（目標${r.target}）` : ''}${(r.ranges || []).length ? `［範囲: ${r.ranges.map(rangeText).join('、')}］` : ''}`).join(', ');
   const up = S.tests.filter(t => t.date >= today).sort((a, b) => a.date.localeCompare(b.date));
   lines.push('\n## これからのテスト');
   lines.push(...(up.length ? up.map(t => `- ${t.date}（あと${daysUntil(t.date)}日） ${t.name}: ${fmtRes(t)}${t.memo ? ` / メモ: ${t.memo}` : ''}`) : ['- なし']));
   const past = S.tests.filter(t => t.date < today).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
   lines.push('\n## 過去のテスト結果');
   lines.push(...(past.length ? past.map(t => `- ${t.date} ${t.name}: ${fmtRes(t)}${t.memo ? ` / メモ: ${t.memo}` : ''}`) : ['- なし']));
+  const pl = (S.plans || []).filter(p => p.date >= today && !p.done).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 20);
+  if (pl.length) { lines.push('\n## 登録済みの予定（未完了）'); pl.forEach(p => lines.push(`- ${p.date} ${planLabel(p)} ${p.minutes}分 ${p.task || ''}`)); }
   const qz = (S.quizzes || []).slice(-10);
   if (qz.length) { lines.push('\n## 最近の小テスト'); qz.forEach(r => lines.push(`- ${r.date} ${subjName(r.subjectId)} ${r.topic || ''}: ${r.correct}/${r.total}`)); }
   return lines.join('\n');
 }
 
 const QUICK = {
-  plan: '今日から7日間の学習計画を、1日ごと・教科と教材ごとの時間配分で作ってください。直近の学習の偏りとテスト予定を考慮してください。',
-  test: '次のテストまでの残り日数で、教科別に何をどれだけやるべきか計画を立ててください。目標点がある教科は、それとの差を踏まえてください。',
+  plan: '今日から7日間の学習計画を、日付ごと（YYYY-MM-DD）・教科と教材ごとの時間配分で作ってください。テスト範囲の参考書を優先してください。直近の学習の偏りとテスト予定を考慮してください。',
+  test: '次のテストまでの残り日数で、テスト範囲の参考書をどの日にどこまで進めるか、日付ごとの計画を立ててください。目標点がある教科は、それとの差を踏まえてください。',
   review: '直近2週間の学習記録を振り返り、良い点・偏り・改善点を具体的に指摘してください。',
   weak: '過去のテスト結果と学習時間から苦手教科を特定し、具体的な対策と使う教材を提案してください。'
 };
@@ -1204,7 +1247,7 @@ function mdLite(text) {
 }
 function renderChat() {
   const box = $('#chat');
-  box.innerHTML = chat.length ? chat.map(m => `<div class="msg ${m.role}${m.error ? ' error' : ''}">${m.role === 'assistant' ? mdLite(m.content) : esc(m.content)}</div>`).join('')
+  box.innerHTML = chat.length ? chat.map((m, i) => `<div class="msg ${m.role}${m.error ? ' error' : ''}">${m.role === 'assistant' ? mdLite(m.content) + (m.error ? '' : `<div class="msg-actions"><button class="small" data-plan-msg="${i}">カレンダーに登録</button></div>`) : esc(m.content)}</div>`).join('')
     : '<div class="empty">学習データをもとに、計画づくりや振り返りを手伝います。上のボタンか下の入力欄からどうぞ。</div>';
   box.scrollTop = box.scrollHeight;
 }
@@ -1265,6 +1308,85 @@ const LEN = {
 const aiLen = () => LEN[S.settings.aiLength] || LEN.short;
 $('#aiLength').onchange = e => { S.settings.aiLength = e.target.value; save(); };
 
+/* ========== 学習予定（AIの計画をカレンダーへ） ========== */
+const plansOn = d => (S.plans || []).filter(p => p.date === d);
+function planLabel(p) { const b = p.bookId ? bookById(p.bookId) : null; return `${subjName(p.subjectId)}${b ? '・' + b.title : ''}`; }
+function planItemsHtml(list) {
+  return list.map(p => `<li><button class="mark${p.done ? ' on' : ''}" data-plan-done="${p.id}" aria-label="${p.done ? '未完了に戻す' : '完了にする'}" style="padding:0;min-height:0"></button><div class="grow"${p.done ? ' style="opacity:.55;text-decoration:line-through"' : ''}><div>${esc(p.task || planLabel(p))}</div><div class="muted">${esc(planLabel(p))}・${fmtMin(p.minutes)}</div></div>${p.done ? '' : `<button class="small" data-plan-log="${p.id}">記録</button>`}<button class="small danger" data-plan-del="${p.id}" aria-label="予定を削除">×</button></li>`).join('');
+}
+document.addEventListener('click', e => {
+  const d = e.target.closest('[data-plan-done]');
+  if (d) { const p = S.plans.find(x => x.id === d.dataset.planDone); if (p) { p.done = !p.done; save(); render(); } return; }
+  const l = e.target.closest('[data-plan-log]');
+  if (l) {
+    const p = S.plans.find(x => x.id === l.dataset.planLog); if (!p) return;
+    openSessionDialog(null, p.date > ymd() ? ymd() : p.date);
+    const v = p.bookId && bookById(p.bookId) ? 'b:' + p.bookId : 's:' + p.subjectId;
+    if ([...$('#ssTarget').options].some(o => o.value === v)) $('#ssTarget').value = v;
+    $('#ssH').value = Math.floor(p.minutes / 60); $('#ssM').value = p.minutes % 60; $('#ssMemo').value = p.task || '';
+    pendingPlanDone = p.id; return;
+  }
+  const x = e.target.closest('[data-plan-del]');
+  if (x && confirm('この予定を削除しますか？')) { S.plans = S.plans.filter(p => p.id !== x.dataset.planDel); save(); render(); }
+});
+
+const PLAN_TOOL = {
+  name: 'register_plan', description: '学習計画をカレンダー登録用の予定リストにする',
+  input_schema: { type: 'object', required: ['items'], properties: { items: { type: 'array', items: {
+    type: 'object', required: ['date', 'subject', 'minutes', 'task'],
+    properties: {
+      date: { type: 'string', description: 'YYYY-MM-DD' },
+      subject: { type: 'string', description: '教科名（一覧のいずれか）' },
+      book: { type: 'string', description: '教材名（一覧に完全一致するもの。なければ空文字）' },
+      minutes: { type: 'integer', minimum: 5, maximum: 600 },
+      task: { type: 'string', description: 'やること（30字以内）' }
+    } } } } }
+};
+let planDraft = [];
+async function planFromMessage(idx, btn) {
+  const msg = chat[idx]; if (!msg) return;
+  btn.disabled = true; btn.textContent = '予定に変換中…';
+  const system = `次の学習計画を、日付ごとの予定リストに変換し register_plan ツールで出力してください。計画に書かれていない予定は追加しないこと。今日は${ymd()}（${'日月火水木金土'[new Date().getDay()]}曜日）。「1日目」などは今日を起点に日付へ直す。\n教科: ${S.subjects.map(s => s.name).join('、')}\n教材: ${S.books.map(b => `${b.title}（${subjName(b.subjectId)}）`).join('、') || 'なし'}`;
+  try {
+    const { toolInput } = await callClaude([{ role: 'user', content: msg.content }], system, 2500, { tools: [PLAN_TOOL], tool_choice: { type: 'tool', name: 'register_plan' } });
+    const items = (toolInput?.items || []).map(it => {
+      const sub = S.subjects.find(s => s.name === it.subject) || S.subjects.find(s => it.subject && (it.subject.includes(s.name) || s.name.includes(it.subject)));
+      const book = it.book ? S.books.find(b => b.title === it.book) || S.books.find(b => b.title.includes(it.book) || it.book.includes(b.title)) : null;
+      return { date: it.date, subjectId: (book && book.subjectId) || sub?.id || '', bookId: book?.id || null, minutes: Math.round(it.minutes) || 30, task: String(it.task || '').slice(0, 60), on: true };
+    }).filter(it => /^\d{4}-\d{2}-\d{2}$/.test(it.date) && it.subjectId);
+    if (!items.length) throw new Error('この回答から日付つきの予定を読み取れませんでした。日ごとの計画を作ってもらってから試してください。');
+    planDraft = items; openPlanDialog();
+  } catch (err) { alert(err.message); }
+  finally { btn.disabled = false; btn.textContent = 'カレンダーに登録'; }
+}
+function openPlanDialog() {
+  $('#plList').innerHTML = planDraft.map((p, i) => `<li><input type="checkbox" data-pl="${i}" ${p.on ? 'checked' : ''} style="width:20px;min-height:20px;flex:none" aria-label="登録する"><div class="grow"><div>${esc(p.task || planLabel(p))}</div><div class="muted">${fmtDateJa(p.date)}・${esc(planLabel(p))}・${fmtMin(p.minutes)}</div></div></li>`).join('');
+  $('#dlgPlan').showModal();
+}
+$('#plList').addEventListener('change', e => { const c = e.target.closest('[data-pl]'); if (c) planDraft[+c.dataset.pl].on = c.checked; });
+$('#plCancel').onclick = () => $('#dlgPlan').close();
+$('#plSave').onclick = () => {
+  const add = planDraft.filter(p => p.on);
+  if (!add.length) return toast('登録する予定を選んでください');
+  (S.plans ||= []).push(...add.map(({ on, ...p }) => ({ id: uid(), ...p, done: false })));
+  save(); $('#dlgPlan').close(); render();
+  const first = add.map(p => p.date).sort()[0];
+  calSel = first; const d = parseYmd(first); calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  toast(`${add.length}件の予定をカレンダーに登録しました`);
+};
+$('#chat').addEventListener('click', e => { const b = e.target.closest('[data-plan-msg]'); if (b) planFromMessage(+b.dataset.planMsg, b); });
+
+/* ========== テスト範囲 ⇔ 参考書 ========== */
+function testRanges({ upcomingOnly = true } = {}) {
+  const today = ymd(), out = [];
+  for (const t of S.tests) {
+    if (upcomingOnly && t.date < today) continue;
+    for (const r of t.results || []) for (const g of r.ranges || []) if (g.bookId || g.range) out.push({ test: t, subjectId: r.subjectId, bookId: g.bookId || null, range: g.range || '' });
+  }
+  return out.sort((a, b) => a.test.date.localeCompare(b.test.date));
+}
+function rangeText(g) { const b = g.bookId ? bookById(g.bookId) : null; return [b ? b.title : '', g.range].filter(Boolean).join(' '); }
+
 /* ========== カレンダー ========== */
 let calMonth = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
 let calSel = ymd();
@@ -1281,16 +1403,19 @@ function renderCalendar() {
     if (i === 35 && d.getMonth() !== mo) break;
     const mins = Object.values(days[k] || {}).reduce((a, b) => a + b, 0);
     const ts = tests[k] || [];
+    const pls = plansOn(k);
     const cls = ['day', d.getMonth() !== mo && 'out', k === today && 'today', ts.length && 'has-test', k === calSel && 'sel'].filter(Boolean).join(' ');
-    html += `<button class="${cls}" data-day="${k}" aria-label="${d.getMonth() + 1}月${d.getDate()}日${ts.length ? ' テストあり' : ''}"><span class="num">${d.getDate()}</span>${ts.map(t => `<span class="t">${esc(t.name)}</span>`).join('')}${mins ? `<span class="m">${fmtMin(mins).replace('時間', 'h').replace('分', 'm')}</span><span class="bar" style="width:${Math.min(100, mins / Math.max(1, S.settings.dailyGoal || 120) * 100)}%"></span>` : ''}</button>`;
+    html += `<button class="${cls}" data-day="${k}" aria-label="${d.getMonth() + 1}月${d.getDate()}日${ts.length ? ' テストあり' : ''}"><span class="num">${d.getDate()}</span>${ts.map(t => `<span class="t">${esc(t.name)}</span>`).join('')}${pls.length ? `<span class="p${pls.every(p => p.done) ? ' done' : ''}">予定${pls.filter(p => p.done).length}/${pls.length}</span>` : ''}${mins ? `<span class="m">${fmtMin(mins).replace('時間', 'h').replace('分', 'm')}</span><span class="bar" style="width:${Math.min(100, mins / Math.max(1, S.settings.dailyGoal || 120) * 100)}%"></span>` : ''}</button>`;
   }
   $('#cal').innerHTML = html;
   const ts = tests[calSel] || [];
   const ss = S.sessions.filter(s => s.date === calSel);
+  const pls = plansOn(calSel);
   $('#calDetail').innerHTML = `<div class="row"><b class="grow">${fmtDateJa(calSel)}</b><button class="small" data-add-session="${calSel}">記録を追加</button><button class="small" id="calAddTest">テストを追加</button></div>
     <ul class="list">${ts.map(t => `<li><span class="countdown${daysUntil(t.date) <= 7 && t.date >= today ? ' soon' : ''}">${esc(t.name)}</span><span class="grow muted">${(t.results || []).map(r => esc(subjName(r.subjectId))).join('・')}</span><button class="small" data-edit-test="${t.id}">編集</button></li>`).join('')}
+    ${planItemsHtml(pls)}
     ${ss.map(s => `<li><span class="dot" style="background:${esc(subjColor(s.subjectId))}"></span><span class="grow">${esc(s.bookId && bookById(s.bookId) ? bookById(s.bookId).title : subjName(s.subjectId))}</span><b>${fmtMin(s.minutes)}</b><button class="small" data-edit-session="${s.id}">編集</button></li>`).join('')}
-    ${!ts.length && !ss.length ? '<li class="empty">予定・記録はありません</li>' : ''}</ul>`;
+    ${!ts.length && !ss.length && !pls.length ? '<li class="empty">予定・記録はありません</li>' : ''}</ul>`;
   $('#calAddTest').onclick = () => { openTestDialog(null); $('#tsDate').value = calSel; };
 }
 $('#cal').addEventListener('click', e => { const d = e.target.closest('[data-day]'); if (d) { calSel = d.dataset.day; const dd = parseYmd(calSel); if (dd.getMonth() !== calMonth.getMonth()) calMonth = new Date(dd.getFullYear(), dd.getMonth(), 1); renderCalendar(); } });
@@ -1311,6 +1436,18 @@ function renderQuizSetup() {
     : '<li class="empty">まだ小テストを解いていません。上で範囲を決めて作成できます。</li>';
 }
 $('#qzSubject').onchange = renderQuizSetup;
+let qzRanges = [];
+function renderQzFrom() {
+  qzRanges = testRanges();
+  $('#qzFromWrap').hidden = !qzRanges.length;
+  $('#qzFrom').innerHTML = '<option value="">選ばない</option>' + qzRanges.map((g, i) => `<option value="${i}">${esc(g.test.name)}・${esc(subjName(g.subjectId))}：${esc(rangeText(g))}</option>`).join('');
+}
+$('#qzFrom').onchange = e => {
+  const g = qzRanges[+e.target.value]; if (!g) return;
+  $('#qzSubject').value = g.subjectId; renderQuizSetup();
+  if (g.bookId) $('#qzBook').value = g.bookId;
+  $('#qzTopic').value = g.range || '';
+};
 
 const QUIZ_TOOL = {
   name: 'make_quiz', description: '4択の小テストを出力する',
@@ -1330,7 +1467,7 @@ $('#btnQuizMake').onclick = async () => {
   const book = bookId ? bookById(bookId) : null;
   const btn = $('#btnQuizMake'); btn.disabled = true; btn.textContent = '作成中…';
   const system = 'あなたは日本の学校の先生です。指定どおりの4択問題を make_quiz ツールで出力してください。answer は正解の添字(0-3)、explanation は60字以内。正解の位置は偏らせない。事実誤認のない問題にする。';
-  const user = `教科: ${subjName(subjectId)}\n${book ? `教材: ${book.title}\n` : ''}範囲・テーマ: ${topic || '教科の重要事項から'}\n難易度: ${level}\n問題数: ${n}`;
+  const user = `教科: ${subjName(subjectId)}\n${book ? `教材: ${book.title}\n` : ''}範囲・テーマ（教材のページ・章の場合はその内容の一般的な学習事項から出題）: ${topic || '教科の重要事項から'}\n難易度: ${level}\n問題数: ${n}`;
   try {
     const { text, toolInput, stop } = await callClaude([{ role: 'user', content: user }], system, 260 * n + 300, { tools: [QUIZ_TOOL], tool_choice: { type: 'tool', name: 'make_quiz' } });
     if (stop === 'max_tokens') throw new Error('問題が長すぎて途中で切れました。問題数を減らして再度お試しください。');
