@@ -1253,7 +1253,23 @@ function renderChat() {
 }
 
 let aiBusy = false;
+const noForcedTool = new Set();
 async function callClaude(messages, system, maxTokens = 2048, extra = {}) {
+  const forced = extra.tool_choice && extra.tool_choice.type === 'tool';
+  if (forced && noForcedTool.has(currentModel())) {
+    extra = { ...extra, tool_choice: { type: 'auto' } };
+    system += `\n\n必ず ${extra.tools[0].name} ツールを呼び出して出力すること。文章での回答はしない。`;
+  }
+  try { return await callClaudeRaw(messages, system, maxTokens, extra); }
+  catch (err) {
+    if (forced && !noForcedTool.has(currentModel()) && /tool_choice/.test(err.message)) {
+      noForcedTool.add(currentModel());
+      return callClaude(messages, system, maxTokens, extra);
+    }
+    throw err;
+  }
+}
+async function callClaudeRaw(messages, system, maxTokens, extra) {
   const key = lsGet(KEY_API, '');
   if (!key) throw new Error('APIキーが未設定です（設定タブ）');
   const res = await fetch(ANTHROPIC_URL, {
@@ -1348,8 +1364,9 @@ async function planFromMessage(idx, btn) {
   btn.disabled = true; btn.textContent = '予定に変換中…';
   const system = `次の学習計画を、日付ごとの予定リストに変換し register_plan ツールで出力してください。計画に書かれていない予定は追加しないこと。今日は${ymd()}（${'日月火水木金土'[new Date().getDay()]}曜日）。「1日目」などは今日を起点に日付へ直す。\n教科: ${S.subjects.map(s => s.name).join('、')}\n教材: ${S.books.map(b => `${b.title}（${subjName(b.subjectId)}）`).join('、') || 'なし'}`;
   try {
-    const { toolInput } = await callClaude([{ role: 'user', content: msg.content }], system, 2500, { tools: [PLAN_TOOL], tool_choice: { type: 'tool', name: 'register_plan' } });
-    const items = (toolInput?.items || []).map(it => {
+    const { toolInput, text } = await callClaude([{ role: 'user', content: msg.content }], system, 2500, { tools: [PLAN_TOOL], tool_choice: { type: 'tool', name: 'register_plan' } });
+    const parsed = toolInput || (() => { try { return parseJsonLoose(text); } catch { return null; } })();
+    const items = (parsed?.items || []).map(it => {
       const sub = S.subjects.find(s => s.name === it.subject) || S.subjects.find(s => it.subject && (it.subject.includes(s.name) || s.name.includes(it.subject)));
       const book = it.book ? S.books.find(b => b.title === it.book) || S.books.find(b => b.title.includes(it.book) || it.book.includes(b.title)) : null;
       return { date: it.date, subjectId: (book && book.subjectId) || sub?.id || '', bookId: book?.id || null, minutes: Math.round(it.minutes) || 30, task: String(it.task || '').slice(0, 60), on: true };
