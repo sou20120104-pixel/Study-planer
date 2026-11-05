@@ -1148,7 +1148,7 @@ function renderChat() {
 }
 
 let aiBusy = false;
-async function callClaude(messages, system, maxTokens = 2048) {
+async function callClaude(messages, system, maxTokens = 2048, extra = {}) {
   const key = lsGet(KEY_API, '');
   if (!key) throw new Error('APIキーが未設定です（設定タブ）');
   const res = await fetch(ANTHROPIC_URL, {
@@ -1159,7 +1159,7 @@ async function callClaude(messages, system, maxTokens = 2048) {
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true'
     },
-    body: JSON.stringify({ model: currentModel(), max_tokens: maxTokens, system, messages })
+    body: JSON.stringify({ model: currentModel(), max_tokens: maxTokens, system, messages, ...extra })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -1168,7 +1168,8 @@ async function callClaude(messages, system, maxTokens = 2048) {
     throw new Error(`APIエラー ${res.status}: ${msg}${hint}`);
   }
   const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
-  return { text, stop: data.stop_reason };
+  const tool = (data.content || []).find(c => c.type === 'tool_use');
+  return { text, stop: data.stop_reason, toolInput: tool ? tool.input : null };
 }
 
 async function sendAi(text) {
@@ -1249,10 +1250,16 @@ function renderQuizSetup() {
 }
 $('#qzSubject').onchange = renderQuizSetup;
 
+const QUIZ_TOOL = {
+  name: 'make_quiz', description: '4択の小テストを出力する',
+  input_schema: { type: 'object', required: ['questions'], properties: { questions: { type: 'array', items: {
+    type: 'object', required: ['q', 'choices', 'answer', 'explanation'],
+    properties: { q: { type: 'string' }, choices: { type: 'array', items: { type: 'string' }, minItems: 4, maxItems: 4 }, answer: { type: 'integer', minimum: 0, maximum: 3 }, explanation: { type: 'string' } } } } } }
+};
 function parseJsonLoose(text) {
   const a = text.indexOf('{'), b = text.lastIndexOf('}');
   if (a < 0 || b < a) throw new Error('問題の形式を読み取れませんでした。もう一度お試しください。');
-  return JSON.parse(text.slice(a, b + 1));
+  try { return JSON.parse(text.slice(a, b + 1)); } catch { throw new Error('問題の形式を読み取れませんでした。もう一度お試しください。'); }
 }
 $('#btnQuizMake').onclick = async () => {
   const subjectId = $('#qzSubject').value, bookId = $('#qzBook').value || null;
@@ -1260,13 +1267,12 @@ $('#btnQuizMake').onclick = async () => {
   const n = Number($('#qzCount').value), level = $('#qzLevel').value, topic = $('#qzTopic').value.trim();
   const book = bookId ? bookById(bookId) : null;
   const btn = $('#btnQuizMake'); btn.disabled = true; btn.textContent = '作成中…';
-  const system = 'あなたは日本の学校の先生です。指定どおりの4択問題をJSONだけで出力してください。説明文やコードブロックは不要です。' +
-    '形式: {"questions":[{"q":"問題文","choices":["選択肢1","選択肢2","選択肢3","選択肢4"],"answer":正解の添字0-3,"explanation":"60字以内の解説"}]}。' +
-    '正解の位置は偏らせない。事実誤認のない問題にする。';
+  const system = 'あなたは日本の学校の先生です。指定どおりの4択問題を make_quiz ツールで出力してください。answer は正解の添字(0-3)、explanation は60字以内。正解の位置は偏らせない。事実誤認のない問題にする。';
   const user = `教科: ${subjName(subjectId)}\n${book ? `教材: ${book.title}\n` : ''}範囲・テーマ: ${topic || '教科の重要事項から'}\n難易度: ${level}\n問題数: ${n}`;
   try {
-    const { text } = await callClaude([{ role: 'user', content: user }], system, 220 * n + 200);
-    const j = parseJsonLoose(text);
+    const { text, toolInput, stop } = await callClaude([{ role: 'user', content: user }], system, 260 * n + 300, { tools: [QUIZ_TOOL], tool_choice: { type: 'tool', name: 'make_quiz' } });
+    if (stop === 'max_tokens') throw new Error('問題が長すぎて途中で切れました。問題数を減らして再度お試しください。');
+    const j = toolInput || parseJsonLoose(text);
     const qs = (j.questions || []).filter(q => q && q.q && Array.isArray(q.choices) && q.choices.length >= 2 && Number.isInteger(q.answer) && q.answer < q.choices.length);
     if (!qs.length) throw new Error('問題を作成できませんでした。範囲を具体的にして再度お試しください。');
     quiz = { subjectId, bookId, topic, level, questions: qs, picks: [], graded: false, more: {} };
