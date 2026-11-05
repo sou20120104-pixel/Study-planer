@@ -1,0 +1,1116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Study Planner</title>
+<meta name="description" content="参考書のバーコードで勉強時間を記録し、教科・テストを管理し、Claudeで学習計画を相談できるスタディプランナー">
+<style>
+:root {
+  --bg: #f6f7fb;
+  --panel: #ffffff;
+  --text: #1d2330;
+  --muted: #6b7385;
+  --line: #e3e6ee;
+  --accent: #3f6ee8;
+  --accent-weak: #e8eefc;
+  --danger: #d64545;
+  --ok: #2f9e6b;
+  --shadow: 0 1px 3px rgba(20, 30, 60, .08);
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151c; --panel: #1b2029; --text: #e7eaf0; --muted: #98a0b2;
+    --line: #2c3240; --accent: #7a9cff; --accent-weak: #232c44; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151c; --panel: #1b2029; --text: #e7eaf0; --muted: #98a0b2;
+  --line: #2c3240; --accent: #7a9cff; --accent-weak: #232c44; --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+  font-size: 15px; line-height: 1.6;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+header.top {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+}
+header.top h1 { font-size: 17px; margin: 0; flex: 1; }
+.timer-chip {
+  display: none; font-variant-numeric: tabular-nums; font-size: 13px;
+  background: var(--accent-weak); color: var(--accent); padding: 3px 10px; border-radius: 99px; cursor: pointer;
+}
+.timer-chip.on { display: inline-block; }
+main { max-width: 860px; margin: 0 auto; padding: 16px; }
+section.view { display: none; }
+section.view.active { display: block; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 16px; margin-bottom: 14px;
+}
+.card h2 { font-size: 15px; margin: 0 0 10px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--muted); font-size: 13px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat { background: var(--accent-weak); border-radius: 10px; padding: 10px; text-align: center; }
+.stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+button, .btn {
+  font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  border-radius: 8px; padding: 8px 14px; cursor: pointer; min-height: 40px;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--danger); }
+button.small { padding: 4px 10px; min-height: 32px; font-size: 13px; }
+button:disabled { opacity: .5; cursor: default; }
+input, select, textarea {
+  font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-height: 40px; width: 100%;
+}
+textarea { min-height: 80px; resize: vertical; }
+label.f { display: block; margin-bottom: 10px; }
+label.f > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 3px; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.list li:last-child { border-bottom: 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--accent-weak); color: var(--text); }
+.empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+.big-timer { font-size: 52px; font-variant-numeric: tabular-nums; text-align: center; letter-spacing: 1px; margin: 8px 0 4px; }
+.timer-target { text-align: center; color: var(--muted); margin-bottom: 12px; }
+.center { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.scan-btn { width: 100%; font-size: 16px; padding: 14px; }
+nav.tabs {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  background: var(--panel); border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+nav.tabs button {
+  border: 0; border-radius: 0; background: none; min-height: 58px; padding: 6px 2px;
+  font-size: 11px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+nav.tabs button svg { width: 22px; height: 22px; }
+nav.tabs button.active { color: var(--accent); }
+dialog {
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text);
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 18px;
+}
+dialog::backdrop { background: rgba(0, 0, 0, .45); }
+dialog h3 { margin: 0 0 12px; font-size: 16px; }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+#scanVideo, #scanReader { width: 100%; border-radius: 8px; background: #000; min-height: 200px; }
+#scanVideo { display: block; max-height: 50vh; object-fit: cover; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-size: 10px; }
+.bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.bar-row .name { width: 72px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-row .track { flex: 1; height: 12px; background: var(--accent-weak); border-radius: 99px; overflow: hidden; }
+.bar-row .fill { height: 100%; border-radius: 99px; }
+.bar-row .val { width: 64px; text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+.chat { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow-y: auto; margin-bottom: 10px; }
+.msg { padding: 10px 12px; border-radius: 10px; white-space: normal; word-wrap: break-word; }
+.msg.user { background: var(--accent-weak); align-self: flex-end; max-width: 85%; white-space: pre-wrap; }
+.msg.assistant { background: var(--bg); border: 1px solid var(--line); }
+.msg.assistant h4 { margin: 8px 0 4px; font-size: 14px; }
+.msg.assistant ul { margin: 4px 0; padding-left: 20px; }
+.msg.assistant p { margin: 4px 0; }
+.msg.error { color: var(--danger); border: 1px solid var(--danger); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.chips button { font-size: 13px; min-height: 32px; padding: 4px 10px; border-radius: 99px; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: #222a; color: #fff; background: rgba(30, 35, 45, .92); padding: 10px 16px; border-radius: 10px;
+  font-size: 14px; z-index: 100; max-width: calc(100vw - 32px); opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; min-height: 34px; padding: 4px 12px; font-size: 13px; }
+.seg button.on { background: var(--accent); color: #fff; }
+.score-grid { display: grid; grid-template-columns: 1fr 70px 70px 70px 36px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.score-grid input, .score-grid select { padding: 6px; min-height: 36px; }
+.countdown { font-weight: 700; color: var(--accent); white-space: nowrap; }
+@media (max-width: 480px) {
+  .big-timer { font-size: 44px; }
+  .score-grid { grid-template-columns: 1fr 56px 56px 56px 32px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Study Planner</h1>
+  <span class="timer-chip" id="timerChip" title="タイマー画面へ"></span>
+</header>
+
+<main>
+  <!-- ホーム -->
+  <section class="view active" id="view-home">
+    <div class="card">
+      <button class="primary scan-btn" data-action="scan">バーコードを読み取って勉強開始</button>
+      <p class="muted" style="margin:8px 0 0">参考書裏表紙の上段（978から始まるISBN）を読み取ってください。未登録の本はその場で登録できます。</p>
+    </div>
+    <div class="card">
+      <h2>学習時間</h2>
+      <div class="stats">
+        <div class="stat"><b id="statToday">0分</b><span>今日</span></div>
+        <div class="stat"><b id="statWeek">0分</b><span>直近7日</span></div>
+        <div class="stat"><b id="statGoal">-</b><span>目標達成</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>次のテスト</h2>
+      <ul class="list" id="homeTests"></ul>
+    </div>
+    <div class="card chart">
+      <h2>直近14日の学習時間</h2>
+      <div id="chartDaily"></div>
+    </div>
+    <div class="card">
+      <h2>教科別（直近30日）</h2>
+      <div id="chartSubjects"></div>
+    </div>
+  </section>
+
+  <!-- タイマー -->
+  <section class="view" id="view-timer">
+    <div class="card">
+      <h2>タイマー</h2>
+      <div class="big-timer" id="bigTimer">00:00:00</div>
+      <div class="timer-target" id="timerTarget">対象未選択</div>
+      <div class="row" style="margin-bottom:12px">
+        <select id="timerBook" class="grow"></select>
+        <button data-action="scan">読取</button>
+      </div>
+      <div class="center">
+        <button class="primary" id="btnStart">開始</button>
+        <button id="btnPause" disabled>一時停止</button>
+        <button id="btnStop" disabled>終了して記録</button>
+        <button class="danger" id="btnCancel" disabled>破棄</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>手動で記録</h2>
+      <div class="row">
+        <select id="manualBook" class="grow"></select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input type="date" id="manualDate" class="grow">
+        <input type="number" id="manualMin" min="1" placeholder="分" style="width:90px">
+        <button class="primary" id="btnManual">追加</button>
+      </div>
+      <input id="manualMemo" placeholder="メモ（任意）" style="margin-top:8px">
+    </div>
+    <div class="card">
+      <h2>最近の記録</h2>
+      <ul class="list" id="sessionList"></ul>
+    </div>
+  </section>
+
+  <!-- 参考書・教科 -->
+  <section class="view" id="view-books">
+    <div class="card">
+      <div class="row" style="margin-bottom:8px">
+        <h2 class="grow" style="margin:0">教科</h2>
+        <button class="small" id="btnAddSubject">＋ 教科</button>
+      </div>
+      <ul class="list" id="subjectList"></ul>
+    </div>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px">
+        <h2 class="grow" style="margin:0">参考書・教材</h2>
+        <button class="small" data-action="scan-register">読取で登録</button>
+        <button class="small" id="btnAddBook">＋ 手入力</button>
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <select id="bookFilter" class="grow"></select>
+      </div>
+      <ul class="list" id="bookList"></ul>
+    </div>
+  </section>
+
+  <!-- テスト -->
+  <section class="view" id="view-tests">
+    <div class="card">
+      <div class="row" style="margin-bottom:8px">
+        <h2 class="grow" style="margin:0">テスト</h2>
+        <div class="seg" id="testSeg">
+          <button class="on" data-v="upcoming">これから</button>
+          <button data-v="past">過去</button>
+        </div>
+        <button class="small primary" id="btnAddTest">＋ 追加</button>
+      </div>
+      <ul class="list" id="testList"></ul>
+    </div>
+    <div class="card chart">
+      <h2>得点率の推移（教科別）</h2>
+      <div id="chartScores"></div>
+    </div>
+  </section>
+
+  <!-- AI -->
+  <section class="view" id="view-ai">
+    <div class="card">
+      <h2>AIに相談（Claude）</h2>
+      <p class="muted" id="aiKeyNote" style="margin-top:0"></p>
+      <div class="chips">
+        <button data-prompt="plan">今週の学習計画を作って</button>
+        <button data-prompt="test">次のテストまでの計画</button>
+        <button data-prompt="review">最近の学習を振り返って</button>
+        <button data-prompt="weak">苦手教科の対策</button>
+      </div>
+      <div class="chat" id="chat"></div>
+      <div class="row">
+        <textarea id="aiInput" class="grow" rows="2" style="min-height:44px" placeholder="質問を入力（Ctrl+Enterで送信）"></textarea>
+      </div>
+      <div class="row" style="margin-top:8px; justify-content:space-between">
+        <label class="muted row" style="gap:6px"><input type="checkbox" id="aiIncludeData" checked style="width:auto;min-height:auto"> 学習データを送る</label>
+        <div class="row">
+          <button class="small" id="btnClearChat">会話をクリア</button>
+          <button class="primary" id="btnSend">送信</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section class="view" id="view-settings">
+    <div class="card">
+      <h2>Claude APIキー</h2>
+      <label class="f"><span>APIキー（sk-ant-...）</span>
+        <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+      </label>
+      <label class="f"><span>モデル</span>
+        <select id="apiModel">
+          <option value="claude-sonnet-5-5">Claude Sonnet 5.5（標準）</option>
+          <option value="claude-opus-5-5">Claude Opus 5.5（高性能）</option>
+          <option value="claude-haiku-5-5">Claude Haiku 5.5（高速・低コスト）</option>
+        </select>
+      </label>
+      <label class="f"><span>モデルID（手入力で上書き・任意）</span>
+        <input id="apiModelCustom" placeholder="例: claude-sonnet-5-5">
+      </label>
+      <div class="row">
+        <button class="primary" id="btnSaveKey">保存</button>
+        <button id="btnTestKey">接続テスト</button>
+        <button class="danger" id="btnDeleteKey">キーを削除</button>
+      </div>
+      <p class="muted">キーはこの端末のブラウザ（localStorage）にのみ保存され、Anthropic のAPIへ直接送信されます。共用PCでは使用後に削除してください。エクスポートしたデータにはキーは含まれません。</p>
+    </div>
+    <div class="card">
+      <h2>目標・表示</h2>
+      <label class="f"><span>1日の目標学習時間（分）</span>
+        <input type="number" id="dailyGoal" min="0" step="10">
+      </label>
+      <label class="f"><span>テーマ</span>
+        <select id="theme">
+          <option value="">端末に合わせる</option>
+          <option value="light">ライト</option>
+          <option value="dark">ダーク</option>
+        </select>
+      </label>
+    </div>
+    <div class="card">
+      <h2>データ</h2>
+      <div class="row">
+        <button id="btnExport">エクスポート（JSON）</button>
+        <button id="btnImport">インポート</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button class="danger" id="btnReset">全データ削除</button>
+      </div>
+      <p class="muted">データはこの端末のブラウザに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきエクスポートしてください。</p>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" id="tabs">
+  <button data-view="home" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>ホーム</button>
+  <button data-view="timer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>タイマー</button>
+  <button data-view="books"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19a2 2 0 0 0 2 2h13"/></svg>教材</button>
+  <button data-view="tests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>テスト</button>
+  <button data-view="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/></svg>AI</button>
+  <button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>設定</button>
+</nav>
+
+<!-- スキャナ -->
+<dialog id="dlgScan">
+  <h3>バーコード読み取り</h3>
+  <video id="scanVideo" playsinline muted></video>
+  <div id="scanReader" hidden></div>
+  <p class="muted" id="scanStatus">カメラを起動しています…</p>
+  <div class="row">
+    <input id="scanManual" inputmode="numeric" placeholder="ISBN / JANを手入力" class="grow">
+    <button id="scanManualBtn">決定</button>
+  </div>
+  <div class="dlg-actions"><button id="scanClose">閉じる</button></div>
+</dialog>
+
+<!-- 教材 -->
+<dialog id="dlgBook">
+  <h3 id="dlgBookTitle">教材を登録</h3>
+  <label class="f"><span>ISBN / バーコード</span><input id="bkIsbn" inputmode="numeric"></label>
+  <label class="f"><span>タイトル</span><input id="bkTitle" required></label>
+  <label class="f"><span>著者・出版社</span><input id="bkAuthor"></label>
+  <label class="f"><span>教科</span><select id="bkSubject"></select></label>
+  <label class="f"><span>メモ（範囲・目標など）</span><input id="bkMemo"></label>
+  <p class="muted" id="bkLookup"></p>
+  <div class="dlg-actions">
+    <button class="danger" id="bkDelete" hidden>削除</button>
+    <button id="bkCancel">キャンセル</button>
+    <button class="primary" id="bkSave">保存</button>
+  </div>
+</dialog>
+
+<!-- 教科 -->
+<dialog id="dlgSubject">
+  <h3>教科</h3>
+  <label class="f"><span>名前</span><input id="sbName"></label>
+  <label class="f"><span>色</span><input type="color" id="sbColor" style="height:44px;padding:4px"></label>
+  <div class="dlg-actions">
+    <button class="danger" id="sbDelete" hidden>削除</button>
+    <button id="sbCancel">キャンセル</button>
+    <button class="primary" id="sbSave">保存</button>
+  </div>
+</dialog>
+
+<!-- テスト -->
+<dialog id="dlgTest">
+  <h3>テスト</h3>
+  <label class="f"><span>テスト名</span><input id="tsName" placeholder="例: 2学期中間テスト"></label>
+  <label class="f"><span>日付</span><input type="date" id="tsDate"></label>
+  <div class="muted" style="margin-bottom:4px">教科ごとの点数（未受験なら空欄、目標点は任意）</div>
+  <div class="score-grid muted" style="font-size:12px"><span>教科</span><span>得点</span><span>満点</span><span>目標</span><span></span></div>
+  <div id="tsScores"></div>
+  <button class="small" id="tsAddRow">＋ 教科を追加</button>
+  <label class="f" style="margin-top:10px"><span>メモ（範囲・反省など）</span><textarea id="tsMemo"></textarea></label>
+  <div class="dlg-actions">
+    <button class="danger" id="tsDelete" hidden>削除</button>
+    <button id="tsCancel">キャンセル</button>
+    <button class="primary" id="tsSave">保存</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ========== 保存・状態 ========== */
+const STORE_KEY = 'studyPlanner.v1';
+const KEY_API = 'studyPlanner.apiKey';
+const KEY_MODEL = 'studyPlanner.model';
+const KEY_CHAT = 'studyPlanner.chat';
+const KEY_THEME = 'studyPlanner.theme';
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+
+const DEFAULT_SUBJECTS = [
+  ['国語', '#e05d5d'], ['数学', '#3f6ee8'], ['英語', '#2f9e6b'], ['理科', '#e0a12f'], ['社会', '#8b5cd6']
+];
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function lsGet(k, def) { try { const v = localStorage.getItem(k); return v === null ? def : v; } catch { return def; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } }
+function lsDel(k) { try { localStorage.removeItem(k); } catch {} }
+
+function freshState() {
+  return {
+    subjects: DEFAULT_SUBJECTS.map(([name, color]) => ({ id: uid(), name, color })),
+    books: [], sessions: [], tests: [],
+    timer: null,
+    settings: { dailyGoal: 120 }
+  };
+}
+function loadState() {
+  try {
+    const raw = lsGet(STORE_KEY, null);
+    if (!raw) return freshState();
+    const s = JSON.parse(raw);
+    return Object.assign(freshState(), s, { settings: Object.assign({ dailyGoal: 120 }, s.settings || {}) });
+  } catch { return freshState(); }
+}
+let S = loadState();
+function save() {
+  if (!lsSet(STORE_KEY, JSON.stringify(S))) toast('保存に失敗しました（ストレージ容量またはプライベートモードを確認）');
+}
+
+/* ========== ユーティリティ ========== */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function pad(n) { return String(n).padStart(2, '0'); }
+function ymd(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function parseYmd(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function daysUntil(dateStr) { return Math.round((parseYmd(dateStr) - parseYmd(ymd())) / 86400000); }
+function fmtMin(m) { m = Math.round(m); if (m < 60) return `${m}分`; const h = Math.floor(m / 60), r = m % 60; return r ? `${h}時間${r}分` : `${h}時間`; }
+function fmtHMS(ms) { const t = Math.floor(ms / 1000); return `${pad(Math.floor(t / 3600))}:${pad(Math.floor(t / 60) % 60)}:${pad(t % 60)}`; }
+function fmtDateJa(s) { const d = parseYmd(s); return `${d.getMonth() + 1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})`; }
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600); }
+const subjectById = id => S.subjects.find(s => s.id === id);
+const bookById = id => S.books.find(b => b.id === id);
+const subjName = id => subjectById(id)?.name ?? '未分類';
+const subjColor = id => subjectById(id)?.color ?? '#999999';
+
+function minutesByDay(fromDate, days) {
+  const map = {};
+  for (let i = 0; i < days; i++) map[ymd(addDays(fromDate, i))] = {};
+  for (const s of S.sessions) if (map[s.date]) map[s.date][s.subjectId] = (map[s.date][s.subjectId] || 0) + s.minutes;
+  return map;
+}
+function sumMinutes(pred) { return S.sessions.filter(pred).reduce((a, s) => a + s.minutes, 0); }
+
+/* ========== 画面切替 ========== */
+function showView(name) {
+  $$('section.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+  $$('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  window.scrollTo(0, 0);
+  render();
+}
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showView(b.dataset.view); });
+$('#timerChip').addEventListener('click', () => showView('timer'));
+
+/* ========== 描画 ========== */
+function bookOptions(includeNone) {
+  let html = includeNone ? '<option value="">（教材なし・教科のみ）</option>' : '';
+  for (const sub of S.subjects) {
+    const bs = S.books.filter(b => b.subjectId === sub.id);
+    if (!bs.length) continue;
+    html += `<optgroup label="${esc(sub.name)}">` + bs.map(b => `<option value="b:${b.id}">${esc(b.title)}</option>`).join('') + '</optgroup>';
+  }
+  const orphan = S.books.filter(b => !subjectById(b.subjectId));
+  if (orphan.length) html += '<optgroup label="未分類">' + orphan.map(b => `<option value="b:${b.id}">${esc(b.title)}</option>`).join('') + '</optgroup>';
+  html += '<optgroup label="教科のみ">' + S.subjects.map(s => `<option value="s:${s.id}">${esc(s.name)}</option>`).join('') + '</optgroup>';
+  return html;
+}
+function parseTarget(v) {
+  if (!v) return null;
+  const [t, id] = [v.slice(0, 1), v.slice(2)];
+  if (t === 'b') { const b = bookById(id); return b ? { bookId: b.id, subjectId: b.subjectId } : null; }
+  if (t === 's') return { bookId: null, subjectId: id };
+  return null;
+}
+function targetLabel(t) {
+  if (!t) return '対象未選択';
+  const b = t.bookId ? bookById(t.bookId) : null;
+  return b ? `${subjName(t.subjectId)} ・ ${b.title}` : subjName(t.subjectId);
+}
+function subjectOptions(sel) { return S.subjects.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join(''); }
+
+function render() {
+  renderHome(); renderTimerView(); renderBooks(); renderTests(); renderAi(); renderSettings();
+}
+
+function renderHome() {
+  const today = ymd();
+  const weekStart = ymd(addDays(new Date(), -6));
+  const tMin = sumMinutes(s => s.date === today) + runningMinutes();
+  const wMin = sumMinutes(s => s.date >= weekStart && s.date <= today) + runningMinutes();
+  $('#statToday').textContent = fmtMin(tMin);
+  $('#statWeek').textContent = fmtMin(wMin);
+  const goal = Number(S.settings.dailyGoal) || 0;
+  $('#statGoal').textContent = goal ? Math.min(999, Math.round(tMin / goal * 100)) + '%' : '-';
+
+  const upcoming = S.tests.filter(t => t.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+  $('#homeTests').innerHTML = upcoming.length ? upcoming.map(t => {
+    const d = daysUntil(t.date);
+    return `<li><div class="grow"><div>${esc(t.name)}</div><div class="muted">${fmtDateJa(t.date)}</div></div><span class="countdown">${d === 0 ? '今日' : 'あと' + d + '日'}</span></li>`;
+  }).join('') : '<li class="empty">予定されたテストはありません。テストタブから追加できます。</li>';
+
+  // 14日の積み上げ棒グラフ
+  const from = addDays(new Date(), -13);
+  const days = minutesByDay(from, 14);
+  const keys = Object.keys(days);
+  const totals = keys.map(k => Object.values(days[k]).reduce((a, b) => a + b, 0));
+  const max = Math.max(60, ...totals, goal);
+  const W = 560, H = 180, padL = 28, padB = 22, bw = (W - padL) / 14;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="直近14日の学習時間">`;
+  const scaleY = v => (H - padB) - v / max * (H - padB - 8);
+  [0, .5, 1].forEach(f => { const v = max * f, y = scaleY(v); svg += `<line x1="${padL}" x2="${W}" y1="${y}" y2="${y}" stroke="currentColor" opacity=".12"/><text x="${padL - 4}" y="${y + 3}" text-anchor="end">${Math.round(v / 60 * 10) / 10}h</text>`; });
+  if (goal) { const y = scaleY(goal); svg += `<line x1="${padL}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--accent)" stroke-dasharray="4 3" opacity=".7"/>`; }
+  keys.forEach((k, i) => {
+    let y = H - padB; const x = padL + i * bw + bw * .18, w = bw * .64;
+    for (const [sid, m] of Object.entries(days[k])) {
+      const h = m / max * (H - padB - 8); y -= h;
+      svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${esc(subjColor(sid))}" rx="2"><title>${esc(subjName(sid))} ${fmtMin(m)}</title></rect>`;
+    }
+    const d = parseYmd(k);
+    if (i % 2 === 1 || i === 13) svg += `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${d.getMonth() + 1}/${d.getDate()}</text>`;
+  });
+  svg += '</svg>';
+  $('#chartDaily').innerHTML = svg + (goal ? '<div class="muted">点線: 1日の目標</div>' : '');
+
+  const from30 = ymd(addDays(new Date(), -29));
+  const bySub = {};
+  for (const s of S.sessions) if (s.date >= from30) bySub[s.subjectId] = (bySub[s.subjectId] || 0) + s.minutes;
+  const entries = Object.entries(bySub).sort((a, b) => b[1] - a[1]);
+  const m2 = Math.max(1, ...entries.map(e => e[1]));
+  $('#chartSubjects').innerHTML = entries.length ? entries.map(([sid, m]) =>
+    `<div class="bar-row"><span class="name">${esc(subjName(sid))}</span><span class="track"><span class="fill" style="display:block;width:${m / m2 * 100}%;background:${esc(subjColor(sid))}"></span></span><span class="val">${fmtMin(m)}</span></div>`
+  ).join('') : '<div class="empty">まだ記録がありません。</div>';
+}
+
+function renderTimerView() {
+  const opts = bookOptions(false);
+  const tb = $('#timerBook'), mb = $('#manualBook');
+  const curT = S.timer ? (S.timer.bookId ? 'b:' + S.timer.bookId : 's:' + S.timer.subjectId) : tb.value;
+  tb.innerHTML = '<option value="">学習する教材・教科を選択</option>' + opts; tb.value = curT || '';
+  const curM = mb.value; mb.innerHTML = opts; if (curM) mb.value = curM;
+  if (!$('#manualDate').value) $('#manualDate').value = ymd();
+  updateTimerUi();
+
+  const recent = [...S.sessions].sort((a, b) => (b.endedAt || 0) - (a.endedAt || 0) || b.date.localeCompare(a.date)).slice(0, 30);
+  $('#sessionList').innerHTML = recent.length ? recent.map(s => {
+    const b = s.bookId ? bookById(s.bookId) : null;
+    return `<li><span class="dot" style="background:${esc(subjColor(s.subjectId))}"></span><div class="grow"><div>${esc(b ? b.title : subjName(s.subjectId))}</div><div class="muted">${fmtDateJa(s.date)} ・ ${esc(subjName(s.subjectId))}${s.memo ? ' ・ ' + esc(s.memo) : ''}</div></div><b>${fmtMin(s.minutes)}</b><button class="small danger" data-del-session="${s.id}" aria-label="削除">×</button></li>`;
+  }).join('') : '<li class="empty">記録はまだありません。</li>';
+}
+
+function renderBooks() {
+  $('#subjectList').innerHTML = S.subjects.length ? S.subjects.map(s => {
+    const n = S.books.filter(b => b.subjectId === s.id).length;
+    const m = sumMinutes(x => x.subjectId === s.id);
+    return `<li><span class="dot" style="background:${esc(s.color)}"></span><div class="grow">${esc(s.name)} <span class="muted">教材${n}冊 ・ 累計${fmtMin(m)}</span></div><button class="small" data-edit-subject="${s.id}">編集</button></li>`;
+  }).join('') : '<li class="empty">教科がありません。</li>';
+
+  const f = $('#bookFilter'); const cur = f.value;
+  f.innerHTML = '<option value="">すべての教科</option>' + subjectOptions(''); f.value = cur;
+  const list = S.books.filter(b => !cur || b.subjectId === cur);
+  $('#bookList').innerHTML = list.length ? list.map(b => {
+    const m = sumMinutes(x => x.bookId === b.id);
+    return `<li><span class="dot" style="background:${esc(subjColor(b.subjectId))}"></span><div class="grow"><div>${esc(b.title)}</div><div class="muted">${esc(subjName(b.subjectId))}${b.author ? ' ・ ' + esc(b.author) : ''} ・ 累計${fmtMin(m)}</div></div><button class="small primary" data-study-book="${b.id}">学習</button><button class="small" data-edit-book="${b.id}">編集</button></li>`;
+  }).join('') : '<li class="empty">教材が登録されていません。バーコード読み取りか手入力で追加してください。</li>';
+}
+
+let testMode = 'upcoming';
+function renderTests() {
+  const today = ymd();
+  const list = S.tests.filter(t => testMode === 'upcoming' ? t.date >= today : t.date < today)
+    .sort((a, b) => testMode === 'upcoming' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
+  $('#testList').innerHTML = list.length ? list.map(t => {
+    const d = daysUntil(t.date);
+    const scored = (t.results || []).filter(r => r.score !== '' && r.score != null);
+    const sum = scored.reduce((a, r) => a + Number(r.score), 0), mx = scored.reduce((a, r) => a + Number(r.max || 100), 0);
+    const subj = (t.results || []).map(r => {
+      const sc = r.score !== '' && r.score != null ? ` ${r.score}/${r.max || 100}` : '';
+      const tg = r.target ? `（目標${r.target}）` : '';
+      return `<span class="tag" style="border-left:3px solid ${esc(subjColor(r.subjectId))}">${esc(subjName(r.subjectId))}${sc}${tg}</span>`;
+    }).join(' ');
+    const right = testMode === 'upcoming'
+      ? `<span class="countdown">${d === 0 ? '今日' : 'あと' + d + '日'}</span>`
+      : (scored.length ? `<b>${Math.round(sum / mx * 100)}%</b>` : '<span class="muted">未入力</span>');
+    return `<li style="align-items:flex-start"><div class="grow"><div>${esc(t.name)} <span class="muted">${fmtDateJa(t.date)}</span></div><div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">${subj}</div>${t.memo ? `<div class="muted" style="margin-top:4px">${esc(t.memo)}</div>` : ''}</div>${right}<button class="small" data-edit-test="${t.id}">編集</button></li>`;
+  }).join('') : `<li class="empty">${testMode === 'upcoming' ? 'これからのテストはありません。' : '過去のテストはありません。'}</li>`;
+  $$('#testSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === testMode));
+  renderScoreChart();
+}
+
+function renderScoreChart() {
+  const tests = S.tests.filter(t => (t.results || []).some(r => r.score !== '' && r.score != null)).sort((a, b) => a.date.localeCompare(b.date)).slice(-10);
+  if (tests.length < 1) { $('#chartScores').innerHTML = '<div class="empty">点数を入力したテストがあると推移が表示されます。</div>'; return; }
+  const W = 560, H = 200, padL = 30, padR = 10, padT = 10, padB = 34;
+  const n = tests.length;
+  const xAt = i => n === 1 ? (padL + W - padR) / 2 : padL + i * (W - padL - padR) / (n - 1);
+  const yAt = p => padT + (1 - p / 100) * (H - padT - padB);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="得点率の推移">`;
+  [0, 50, 100].forEach(p => svg += `<line x1="${padL}" x2="${W - padR}" y1="${yAt(p)}" y2="${yAt(p)}" stroke="currentColor" opacity=".12"/><text x="${padL - 4}" y="${yAt(p) + 3}" text-anchor="end">${p}%</text>`);
+  tests.forEach((t, i) => svg += `<text x="${xAt(i)}" y="${H - 18}" text-anchor="middle">${fmtDateJa(t.date).replace(/\(.\)/, '')}</text><text x="${xAt(i)}" y="${H - 5}" text-anchor="middle">${esc(t.name.slice(0, 6))}</text>`);
+  const sids = [...new Set(tests.flatMap(t => t.results.filter(r => r.score !== '' && r.score != null).map(r => r.subjectId)))];
+  for (const sid of sids) {
+    const pts = [];
+    tests.forEach((t, i) => { const r = t.results.find(r => r.subjectId === sid && r.score !== '' && r.score != null); if (r) pts.push([xAt(i), yAt(Number(r.score) / Number(r.max || 100) * 100), Math.round(Number(r.score) / Number(r.max || 100) * 100)]); });
+    const c = esc(subjColor(sid));
+    if (pts.length > 1) svg += `<polyline fill="none" stroke="${c}" stroke-width="2" points="${pts.map(p => p[0] + ',' + p[1]).join(' ')}"/>`;
+    pts.forEach(p => svg += `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${c}"><title>${esc(subjName(sid))} ${p[2]}%</title></circle>`);
+  }
+  svg += '</svg>';
+  const legend = sids.map(sid => `<span class="row" style="gap:4px;display:inline-flex;margin-right:10px"><span class="dot" style="background:${esc(subjColor(sid))}"></span>${esc(subjName(sid))}</span>`).join('');
+  $('#chartScores').innerHTML = svg + `<div class="muted">${legend}</div>`;
+}
+
+function renderAi() {
+  const key = lsGet(KEY_API, '');
+  $('#aiKeyNote').innerHTML = key ? `モデル: ${esc(currentModel())}` : 'APIキーが未設定です。<a href="#" id="goSettings">設定</a>でClaudeのAPIキーを入力してください。';
+  const g = $('#goSettings'); if (g) g.onclick = e => { e.preventDefault(); showView('settings'); };
+  renderChat();
+}
+
+function renderSettings() {
+  const key = lsGet(KEY_API, '');
+  const ki = $('#apiKey'); if (document.activeElement !== ki) ki.value = key;
+  const m = currentModel();
+  const sel = $('#apiModel');
+  if ([...sel.options].some(o => o.value === m)) { sel.value = m; $('#apiModelCustom').value = ''; }
+  else $('#apiModelCustom').value = m;
+  const dg = $('#dailyGoal'); if (document.activeElement !== dg) dg.value = S.settings.dailyGoal;
+  $('#theme').value = lsGet(KEY_THEME, '');
+}
+
+/* ========== タイマー ========== */
+function timerElapsed() {
+  const t = S.timer; if (!t) return 0;
+  return t.accumulated + (t.running ? Date.now() - t.startedAt : 0);
+}
+function runningMinutes() { return S.timer ? timerElapsed() / 60000 : 0; }
+function updateTimerUi() {
+  const t = S.timer;
+  $('#bigTimer').textContent = fmtHMS(timerElapsed());
+  $('#timerTarget').textContent = t ? targetLabel(t) + (t.running ? '' : '（一時停止中）') : '対象未選択';
+  $('#btnStart').textContent = t && !t.running ? '再開' : '開始';
+  $('#btnStart').disabled = !!(t && t.running);
+  $('#btnPause').disabled = !(t && t.running);
+  $('#btnStop').disabled = !t;
+  $('#btnCancel').disabled = !t;
+  $('#timerBook').disabled = !!t;
+  const chip = $('#timerChip');
+  chip.classList.toggle('on', !!t);
+  if (t) chip.textContent = (t.running ? '● ' : '❚❚ ') + fmtHMS(timerElapsed());
+}
+function startTimer(target) {
+  if (S.timer) {
+    if (!S.timer.running) { S.timer.running = true; S.timer.startedAt = Date.now(); save(); updateTimerUi(); }
+    return;
+  }
+  if (!target) { toast('学習する教材か教科を選んでください'); return; }
+  S.timer = { ...target, startedAt: Date.now(), accumulated: 0, running: true, firstStart: Date.now() };
+  save(); updateTimerUi(); toast('計測を開始しました：' + targetLabel(target));
+}
+function pauseTimer() {
+  const t = S.timer; if (!t || !t.running) return;
+  t.accumulated += Date.now() - t.startedAt; t.running = false; save(); updateTimerUi();
+}
+function stopTimer() {
+  const t = S.timer; if (!t) return;
+  const ms = timerElapsed();
+  const minutes = Math.round(ms / 60000);
+  if (minutes < 1) { if (!confirm('1分未満のため記録されません。タイマーを終了しますか？')) return; S.timer = null; save(); render(); return; }
+  const memo = prompt(`${fmtMin(minutes)} を記録します。メモ（任意）`, '') ;
+  if (memo === null) return;
+  S.sessions.push({ id: uid(), bookId: t.bookId, subjectId: t.subjectId, date: ymd(new Date(t.firstStart || Date.now())), minutes, memo: memo.trim(), endedAt: Date.now() });
+  S.timer = null; save(); render(); toast(`${fmtMin(minutes)} を記録しました`);
+}
+$('#btnStart').onclick = () => startTimer(parseTarget($('#timerBook').value));
+$('#btnPause').onclick = pauseTimer;
+$('#btnStop').onclick = stopTimer;
+$('#btnCancel').onclick = () => { if (confirm('計測中の時間を破棄しますか？')) { S.timer = null; save(); render(); } };
+setInterval(() => { if (S.timer) { updateTimerUi(); if ($('#view-home').classList.contains('active')) { $('#statToday').textContent = fmtMin(sumMinutes(s => s.date === ymd()) + runningMinutes()); } } }, 1000);
+
+$('#btnManual').onclick = () => {
+  const t = parseTarget($('#manualBook').value);
+  const m = Number($('#manualMin').value);
+  const d = $('#manualDate').value;
+  if (!t) return toast('教材か教科を選んでください');
+  if (!(m > 0)) return toast('分数を入力してください');
+  if (!d) return toast('日付を入力してください');
+  S.sessions.push({ id: uid(), ...t, date: d, minutes: Math.round(m), memo: $('#manualMemo').value.trim(), endedAt: Date.now() });
+  $('#manualMin').value = ''; $('#manualMemo').value = '';
+  save(); render(); toast('記録しました');
+};
+document.addEventListener('click', e => {
+  const del = e.target.closest('[data-del-session]');
+  if (del && confirm('この記録を削除しますか？')) { S.sessions = S.sessions.filter(s => s.id !== del.dataset.delSession); save(); render(); }
+});
+
+/* ========== バーコード ========== */
+let scanStream = null, scanLoop = null, html5Scanner = null, scanHandler = null, scanBusy = false;
+
+function normalizeCode(raw) {
+  const c = String(raw).replace(/[^0-9Xx]/g, '').toUpperCase();
+  if (c.length === 10) return isbn10to13(c) || c;
+  return c;
+}
+function isbn10to13(c) {
+  if (!/^\d{9}[\dX]$/.test(c)) return null;
+  const b = '978' + c.slice(0, 9);
+  let s = 0; for (let i = 0; i < 12; i++) s += Number(b[i]) * (i % 2 ? 3 : 1);
+  return b + ((10 - s % 10) % 10);
+}
+function isPriceCode(c) { return /^19[12]\d{10}$/.test(c); } // 書籍JANの下段（分類・価格）
+
+async function openScanner(handler) {
+  scanHandler = handler; scanBusy = false;
+  const dlg = $('#dlgScan');
+  $('#scanManual').value = '';
+  $('#scanStatus').textContent = 'カメラを起動しています…';
+  dlg.showModal();
+  if (!window.isSecureContext) { $('#scanStatus').textContent = 'カメラはHTTPS（またはlocalhost）でのみ使えます。下の欄に手入力してください。'; $('#scanVideo').hidden = true; return; }
+  try {
+    let native = false;
+    if ('BarcodeDetector' in window) {
+      try { const f = await BarcodeDetector.getSupportedFormats(); native = f.includes('ean_13'); } catch { native = false; }
+    }
+    if (native) await startNativeScan(); else await startFallbackScan();
+  } catch (err) {
+    console.error(err);
+    $('#scanStatus').textContent = 'カメラを起動できませんでした（' + (err.name || err.message || err) + '）。手入力してください。';
+  }
+}
+async function startNativeScan() {
+  const video = $('#scanVideo'); video.hidden = false; $('#scanReader').hidden = true;
+  scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
+  video.srcObject = scanStream; await video.play();
+  const det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
+  $('#scanStatus').textContent = 'バーコードを枠内に映してください';
+  const tick = async () => {
+    if (!scanStream) return;
+    try {
+      const codes = await det.detect(video);
+      for (const c of codes) if (onScanned(c.rawValue)) return;
+    } catch {}
+    scanLoop = setTimeout(tick, 200);
+  };
+  tick();
+}
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('ライブラリを読み込めませんでした')); document.head.appendChild(s); });
+}
+async function startFallbackScan() {
+  $('#scanVideo').hidden = true; const r = $('#scanReader'); r.hidden = false; r.innerHTML = '';
+  if (!window.Html5Qrcode) await loadScript('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js');
+  const F = window.Html5QrcodeSupportedFormats;
+  html5Scanner = new Html5Qrcode('scanReader', { formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128], verbose: false });
+  await html5Scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 120 } }, text => onScanned(text), () => {});
+  $('#scanStatus').textContent = 'バーコードを枠内に映してください';
+}
+async function stopScanner() {
+  clearTimeout(scanLoop); scanLoop = null;
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  if (html5Scanner) { try { await html5Scanner.stop(); html5Scanner.clear(); } catch {} html5Scanner = null; }
+  $('#scanVideo').srcObject = null;
+}
+function onScanned(raw) {
+  if (scanBusy) return true;
+  const code = normalizeCode(raw);
+  if (code.length < 8) return false;
+  if (isPriceCode(code)) { $('#scanStatus').textContent = '下段（192/191…）は価格コードです。上段の978から始まるバーコードを映してください。'; return false; }
+  scanBusy = true;
+  if (navigator.vibrate) navigator.vibrate(80);
+  closeScanner().then(() => scanHandler && scanHandler(code));
+  return true;
+}
+async function closeScanner() { await stopScanner(); const d = $('#dlgScan'); if (d.open) d.close(); }
+$('#scanClose').onclick = closeScanner;
+$('#dlgScan').addEventListener('cancel', e => { e.preventDefault(); closeScanner(); });
+$('#scanManualBtn').onclick = () => { const v = $('#scanManual').value.trim(); if (v) { scanBusy = false; onScanned(v); } };
+$('#scanManual').addEventListener('keydown', e => { if (e.key === 'Enter') $('#scanManualBtn').click(); });
+
+// 読み取り → 登録済みなら計測開始、未登録なら登録画面
+function handleStudyScan(code) {
+  const b = S.books.find(x => x.isbn === code);
+  if (b) { beginStudyBook(b); return; }
+  openBookDialog(null, { isbn: code, startAfterSave: true });
+}
+function beginStudyBook(b) {
+  if (S.timer) {
+    if (S.timer.bookId === b.id) { showView('timer'); if (!S.timer.running) startTimer(); return; }
+    if (!confirm(`計測中の「${targetLabel(S.timer)}」を終了して記録し、「${b.title}」を開始しますか？`)) { showView('timer'); return; }
+    stopTimer();
+    if (S.timer) { showView('timer'); return; } // 記録がキャンセルされた
+  }
+  showView('timer');
+  startTimer({ bookId: b.id, subjectId: b.subjectId });
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-action]'); if (!a) return;
+  if (a.dataset.action === 'scan') openScanner(handleStudyScan);
+  if (a.dataset.action === 'scan-register') openScanner(code => {
+    const b = S.books.find(x => x.isbn === code);
+    if (b) { toast('登録済みの教材です'); openBookDialog(b); } else openBookDialog(null, { isbn: code });
+  });
+});
+
+async function lookupIsbn(isbn) {
+  if (!/^97[89]\d{10}$/.test(isbn)) return null;
+  try {
+    const r = await fetch('https://api.openbd.jp/v1/get?isbn=' + isbn);
+    const j = await r.json();
+    const s = j && j[0] && j[0].summary;
+    if (s && s.title) return { title: s.title, author: [s.author, s.publisher].filter(Boolean).join(' / ') };
+  } catch {}
+  try {
+    const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn);
+    const j = await r.json();
+    const v = j.items && j.items[0] && j.items[0].volumeInfo;
+    if (v && v.title) return { title: v.title + (v.subtitle ? ' ' + v.subtitle : ''), author: [(v.authors || []).join(', '), v.publisher].filter(Boolean).join(' / ') };
+  } catch {}
+  return null;
+}
+
+/* ========== 教材ダイアログ ========== */
+let editingBook = null, bookOpts = {};
+function openBookDialog(book, opts = {}) {
+  editingBook = book; bookOpts = opts;
+  $('#dlgBookTitle').textContent = book ? '教材を編集' : '教材を登録';
+  $('#bkIsbn').value = book?.isbn ?? opts.isbn ?? '';
+  $('#bkTitle').value = book?.title ?? '';
+  $('#bkAuthor').value = book?.author ?? '';
+  $('#bkMemo').value = book?.memo ?? '';
+  $('#bkSubject').innerHTML = subjectOptions(book?.subjectId ?? $('#bookFilter').value);
+  $('#bkDelete').hidden = !book;
+  $('#bkLookup').textContent = '';
+  $('#dlgBook').showModal();
+  if (!book && opts.isbn) {
+    $('#bkLookup').textContent = '書籍情報を検索中…';
+    lookupIsbn(opts.isbn).then(info => {
+      if (editingBook !== book || !$('#dlgBook').open) return;
+      if (info) {
+        if (!$('#bkTitle').value) $('#bkTitle').value = info.title;
+        if (!$('#bkAuthor').value) $('#bkAuthor').value = info.author;
+        $('#bkLookup').textContent = '書籍情報を自動入力しました。教科を選んで保存してください。';
+      } else $('#bkLookup').textContent = '書籍情報が見つかりませんでした。タイトルを入力してください。';
+    });
+  }
+}
+$('#btnAddBook').onclick = () => openBookDialog(null);
+$('#bkCancel').onclick = () => $('#dlgBook').close();
+$('#bkSave').onclick = () => {
+  const title = $('#bkTitle').value.trim();
+  if (!title) return toast('タイトルを入力してください');
+  if (!S.subjects.length) return toast('先に教科を追加してください');
+  const isbn = normalizeCode($('#bkIsbn').value) || '';
+  const dup = isbn && S.books.find(b => b.isbn === isbn && b !== editingBook);
+  if (dup) return toast('このバーコードは「' + dup.title + '」に登録済みです');
+  const data = { isbn, title, author: $('#bkAuthor').value.trim(), subjectId: $('#bkSubject').value, memo: $('#bkMemo').value.trim() };
+  let b = editingBook;
+  if (b) {
+    Object.assign(b, data);
+    S.sessions.forEach(s => { if (s.bookId === b.id) s.subjectId = b.subjectId; });
+    if (S.timer && S.timer.bookId === b.id) S.timer.subjectId = b.subjectId;
+  } else { b = { id: uid(), createdAt: Date.now(), ...data }; S.books.push(b); }
+  save(); $('#dlgBook').close(); render(); toast('保存しました');
+  if (bookOpts.startAfterSave) beginStudyBook(b);
+};
+$('#bkDelete').onclick = () => {
+  const b = editingBook; if (!b) return;
+  if (S.timer && S.timer.bookId === b.id) return toast('計測中の教材は削除できません');
+  if (!confirm(`「${b.title}」を削除しますか？（学習記録は教科のみの記録として残ります）`)) return;
+  S.sessions.forEach(s => { if (s.bookId === b.id) s.bookId = null; });
+  S.books = S.books.filter(x => x !== b); save(); $('#dlgBook').close(); render();
+};
+$('#bookFilter').onchange = renderBooks;
+document.addEventListener('click', e => {
+  const ed = e.target.closest('[data-edit-book]'); if (ed) openBookDialog(bookById(ed.dataset.editBook));
+  const st = e.target.closest('[data-study-book]'); if (st) beginStudyBook(bookById(st.dataset.studyBook));
+});
+
+/* ========== 教科ダイアログ ========== */
+let editingSubject = null;
+function openSubjectDialog(s) {
+  editingSubject = s;
+  $('#sbName').value = s?.name ?? '';
+  $('#sbColor').value = s?.color ?? '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+  $('#sbDelete').hidden = !s;
+  $('#dlgSubject').showModal();
+}
+$('#btnAddSubject').onclick = () => openSubjectDialog(null);
+$('#sbCancel').onclick = () => $('#dlgSubject').close();
+$('#sbSave').onclick = () => {
+  const name = $('#sbName').value.trim(); if (!name) return toast('教科名を入力してください');
+  if (editingSubject) Object.assign(editingSubject, { name, color: $('#sbColor').value });
+  else S.subjects.push({ id: uid(), name, color: $('#sbColor').value });
+  save(); $('#dlgSubject').close(); render();
+};
+$('#sbDelete').onclick = () => {
+  const s = editingSubject; if (!s) return;
+  const nb = S.books.filter(b => b.subjectId === s.id).length;
+  if (S.timer && S.timer.subjectId === s.id) return toast('計測中の教科は削除できません');
+  if (!confirm(`「${s.name}」を削除しますか？${nb ? `\nこの教科の教材${nb}冊と過去の記録は「未分類」になります。` : ''}`)) return;
+  S.subjects = S.subjects.filter(x => x !== s); save(); $('#dlgSubject').close(); render();
+};
+document.addEventListener('click', e => { const ed = e.target.closest('[data-edit-subject]'); if (ed) openSubjectDialog(subjectById(ed.dataset.editSubject)); });
+
+/* ========== テストダイアログ ========== */
+let editingTest = null;
+function scoreRow(r = {}) {
+  const div = document.createElement('div'); div.className = 'score-grid';
+  div.innerHTML = `<select>${subjectOptions(r.subjectId)}</select><input type="number" min="0" placeholder="-" value="${esc(r.score ?? '')}"><input type="number" min="1" value="${esc(r.max ?? 100)}"><input type="number" min="0" placeholder="-" value="${esc(r.target ?? '')}"><button class="small danger" aria-label="行を削除">×</button>`;
+  div.querySelector('button').onclick = () => div.remove();
+  $('#tsScores').appendChild(div);
+}
+function openTestDialog(t) {
+  editingTest = t;
+  $('#tsName').value = t?.name ?? '';
+  $('#tsDate').value = t?.date ?? ymd(addDays(new Date(), 14));
+  $('#tsMemo').value = t?.memo ?? '';
+  $('#tsScores').innerHTML = '';
+  (t?.results?.length ? t.results : S.subjects.map(s => ({ subjectId: s.id }))).forEach(scoreRow);
+  $('#tsDelete').hidden = !t;
+  $('#dlgTest').showModal();
+}
+$('#btnAddTest').onclick = () => openTestDialog(null);
+$('#tsAddRow').onclick = () => scoreRow({});
+$('#tsCancel').onclick = () => $('#dlgTest').close();
+$('#tsSave').onclick = () => {
+  const name = $('#tsName').value.trim(), date = $('#tsDate').value;
+  if (!name || !date) return toast('テスト名と日付を入力してください');
+  const results = $$('#tsScores .score-grid').map(row => {
+    const [sel, sc, mx, tg] = row.querySelectorAll('select, input');
+    return { subjectId: sel.value, score: sc.value === '' ? '' : Number(sc.value), max: Number(mx.value) || 100, target: tg.value === '' ? '' : Number(tg.value) };
+  }).filter(r => r.subjectId);
+  const data = { name, date, memo: $('#tsMemo').value.trim(), results };
+  if (editingTest) Object.assign(editingTest, data); else S.tests.push({ id: uid(), ...data });
+  testMode = date >= ymd() ? 'upcoming' : 'past';
+  save(); $('#dlgTest').close(); render();
+};
+$('#tsDelete').onclick = () => { if (editingTest && confirm('このテストを削除しますか？')) { S.tests = S.tests.filter(t => t !== editingTest); save(); $('#dlgTest').close(); render(); } };
+$('#testSeg').onclick = e => { const b = e.target.closest('button'); if (b) { testMode = b.dataset.v; renderTests(); } };
+document.addEventListener('click', e => { const ed = e.target.closest('[data-edit-test]'); if (ed) openTestDialog(S.tests.find(t => t.id === ed.dataset.editTest)); });
+
+/* ========== AI (Claude) ========== */
+function currentModel() { return lsGet(KEY_MODEL, 'claude-sonnet-5-5'); }
+let chat = (() => { try { return JSON.parse(lsGet(KEY_CHAT, '[]')); } catch { return []; } })();
+function saveChat() { lsSet(KEY_CHAT, JSON.stringify(chat.slice(-40))); }
+
+function buildContext() {
+  const today = ymd();
+  const lines = [`今日: ${today}（${'日月火水木金土'[new Date().getDay()]}曜日）`, `1日の目標学習時間: ${S.settings.dailyGoal || '未設定'}分`];
+  lines.push('\n## 教科と教材（累計学習時間）');
+  for (const s of S.subjects) {
+    lines.push(`- ${s.name}: 累計${sumMinutes(x => x.subjectId === s.id)}分`);
+    for (const b of S.books.filter(b => b.subjectId === s.id)) lines.push(`  - ${b.title}${b.memo ? `（${b.memo}）` : ''}: 累計${sumMinutes(x => x.bookId === b.id)}分`);
+  }
+  lines.push('\n## 直近14日の学習時間（分）');
+  const days = minutesByDay(addDays(new Date(), -13), 14);
+  for (const [d, m] of Object.entries(days)) {
+    const parts = Object.entries(m).map(([sid, v]) => `${subjName(sid)}${v}`);
+    lines.push(`- ${d}: ${parts.length ? parts.join(', ') : '0'}`);
+  }
+  const fmtRes = t => (t.results || []).map(r => `${subjName(r.subjectId)}${r.score !== '' && r.score != null ? ` ${r.score}/${r.max}` : ''}${r.target ? `（目標${r.target}）` : ''}`).join(', ');
+  const up = S.tests.filter(t => t.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+  lines.push('\n## これからのテスト');
+  lines.push(...(up.length ? up.map(t => `- ${t.date}（あと${daysUntil(t.date)}日） ${t.name}: ${fmtRes(t)}${t.memo ? ` / メモ: ${t.memo}` : ''}`) : ['- なし']));
+  const past = S.tests.filter(t => t.date < today).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+  lines.push('\n## 過去のテスト結果');
+  lines.push(...(past.length ? past.map(t => `- ${t.date} ${t.name}: ${fmtRes(t)}${t.memo ? ` / メモ: ${t.memo}` : ''}`) : ['- なし']));
+  return lines.join('\n');
+}
+
+const QUICK = {
+  plan: '今日から7日間の学習計画を、1日ごと・教科と教材ごとの時間配分で作ってください。直近の学習の偏りとテスト予定を考慮してください。',
+  test: '次のテストまでの残り日数で、教科別に何をどれだけやるべきか計画を立ててください。目標点がある教科は、それとの差を踏まえてください。',
+  review: '直近2週間の学習記録を振り返り、良い点・偏り・改善点を具体的に指摘してください。',
+  weak: '過去のテスト結果と学習時間から苦手教科を特定し、具体的な対策と使う教材を提案してください。'
+};
+
+function mdLite(text) {
+  const lines = esc(text).split('\n'); let html = '', inList = false;
+  for (let l of lines) {
+    l = l.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+    const li = l.match(/^\s*(?:[-*・]|\d+\.)\s+(.*)$/);
+    const h = l.match(/^#{1,4}\s+(.*)$/);
+    if (li) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${li[1]}</li>`; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (h) html += `<h4>${h[1]}</h4>`;
+    else if (l.trim() === '') html += '';
+    else html += `<p>${l}</p>`;
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+function renderChat() {
+  const box = $('#chat');
+  box.innerHTML = chat.length ? chat.map(m => `<div class="msg ${m.role}${m.error ? ' error' : ''}">${m.role === 'assistant' ? mdLite(m.content) : esc(m.content)}</div>`).join('')
+    : '<div class="empty">学習データをもとに、計画づくりや振り返りを手伝います。上のボタンか下の入力欄からどうぞ。</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+let aiBusy = false;
+async function callClaude(messages, system, maxTokens = 2048) {
+  const key = lsGet(KEY_API, '');
+  if (!key) throw new Error('APIキーが未設定です（設定タブ）');
+  const res = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({ model: currentModel(), max_tokens: maxTokens, system, messages })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.error?.message || res.statusText;
+    const hint = res.status === 401 ? '（APIキーが正しいか確認してください）' : res.status === 404 ? '（モデルIDを確認してください）' : res.status === 429 ? '（利用上限・レート制限に達しました）' : '';
+    throw new Error(`APIエラー ${res.status}: ${msg}${hint}`);
+  }
+  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+  return { text, stop: data.stop_reason };
+}
+
+async function sendAi(text) {
+  if (aiBusy || !text.trim()) return;
+  aiBusy = true; $('#btnSend').disabled = true;
+  chat.push({ role: 'user', content: text.trim() }); saveChat(); renderChat();
+  const box = $('#chat'); const pending = document.createElement('div'); pending.className = 'msg assistant'; pending.textContent = '考え中…'; box.appendChild(pending); box.scrollTop = box.scrollHeight;
+  let system = 'あなたは学習者を支えるスタディコーチです。日本語で、結論を先に、具体的かつ実行可能な提案をしてください。時間配分は分単位で示し、無理のない計画にしてください。';
+  if ($('#aiIncludeData').checked) system += '\n\n以下はユーザーのスタディプランナーに記録された最新データです。\n\n' + buildContext();
+  const history = chat.filter(m => !m.error).slice(-20).map(m => ({ role: m.role, content: m.content }));
+  while (history.length && history[0].role !== 'user') history.shift();
+  try {
+    const { text: reply, stop } = await callClaude(history, system);
+    chat.push({ role: 'assistant', content: (reply || '（応答が空でした）') + (stop === 'max_tokens' ? '\n\n（長さの上限で途中までの回答です。「続けて」と送ると続きを書きます）' : '') });
+  } catch (err) {
+    chat.push({ role: 'assistant', content: err.message || String(err), error: true });
+  }
+  saveChat(); aiBusy = false; $('#btnSend').disabled = false; renderChat();
+}
+$('#btnSend').onclick = () => { const v = $('#aiInput').value; $('#aiInput').value = ''; sendAi(v); };
+$('#aiInput').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('#btnSend').click(); } });
+$$('[data-prompt]').forEach(b => b.onclick = () => sendAi(QUICK[b.dataset.prompt]));
+$('#btnClearChat').onclick = () => { if (confirm('会話履歴を消去しますか？')) { chat = []; saveChat(); renderChat(); } };
+
+/* ========== 設定 ========== */
+function saveKeySettings() {
+  const k = $('#apiKey').value.trim();
+  if (k) lsSet(KEY_API, k); else lsDel(KEY_API);
+  lsSet(KEY_MODEL, $('#apiModelCustom').value.trim() || $('#apiModel').value);
+}
+$('#btnSaveKey').onclick = () => { saveKeySettings(); render(); toast('保存しました'); };
+$('#btnTestKey').onclick = async () => {
+  saveKeySettings();
+  const b = $('#btnTestKey'); b.disabled = true; b.textContent = 'テスト中…';
+  try { await callClaude([{ role: 'user', content: '「OK」とだけ返してください。' }], 'Reply briefly.', 16); toast('接続OK：' + currentModel()); }
+  catch (err) { alert(err.message); }
+  finally { b.disabled = false; b.textContent = '接続テスト'; }
+};
+$('#btnDeleteKey').onclick = () => { if (confirm('保存したAPIキーを削除しますか？')) { lsDel(KEY_API); $('#apiKey').value = ''; render(); toast('削除しました'); } };
+$('#apiModel').onchange = () => { $('#apiModelCustom').value = ''; };
+$('#dailyGoal').onchange = e => { S.settings.dailyGoal = Math.max(0, Number(e.target.value) || 0); save(); };
+function applyTheme() { const t = lsGet(KEY_THEME, ''); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+$('#theme').onchange = e => { if (e.target.value) lsSet(KEY_THEME, e.target.value); else lsDel(KEY_THEME); applyTheme(); };
+
+$('#btnExport').onclick = () => {
+  const blob = new Blob([JSON.stringify({ app: 'study-planner', version: 1, exportedAt: new Date().toISOString(), data: S }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `study-planner-${ymd()}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('#btnImport').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    const d = j.data || j;
+    if (!Array.isArray(d.subjects) || !Array.isArray(d.sessions)) throw new Error('形式が正しくありません');
+    if (!confirm('現在のデータをインポートしたデータで置き換えますか？')) return;
+    S = Object.assign(freshState(), d); save(); render(); toast('インポートしました');
+  } catch (err) { alert('インポートに失敗しました: ' + err.message); }
+  finally { e.target.value = ''; }
+};
+$('#btnReset').onclick = () => {
+  if (!confirm('すべての学習データを削除します。元に戻せません。よろしいですか？')) return;
+  S = freshState(); save(); chat = []; saveChat(); render(); toast('削除しました');
+};
+
+/* ========== 起動 ========== */
+applyTheme();
+render();
+</script>
+</body>
+</html>
