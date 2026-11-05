@@ -30,6 +30,7 @@
   --lead: #ece9ea; --muted: #a39da2; --pen: #ff6478; --on-lead: #1b1c20;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--paper); color: var(--lead); font-family: var(--ui);
@@ -226,6 +227,7 @@ dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color:
   <section class="view active" id="view-home">
     <div class="card plain">
       <button class="primary scan-btn" data-action="scan"><span class="bars" aria-hidden="true"></span>参考書を読み取って勉強を始める</button>
+      <button style="width:100%;margin-top:8px" data-add-session>あとから記録する</button>
       <p class="muted" style="margin:6px 0 0;text-align:center">裏表紙の上段（978…）を読み取ります。未登録の本はその場で登録できます。</p>
     </div>
     <div class="card">
@@ -267,17 +269,8 @@ dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color:
         <button class="danger" id="btnCancel" disabled>破棄</button>
       </div>
     </div>
-    <div class="card">
-      <h2>手動で記録</h2>
-      <div class="row">
-        <select id="manualBook" class="grow"></select>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <input type="date" id="manualDate" class="grow">
-        <input type="number" id="manualMin" min="1" placeholder="分" style="width:90px">
-        <button class="primary" id="btnManual">追加</button>
-      </div>
-      <input id="manualMemo" placeholder="メモ（任意）" style="margin-top:8px">
+    <div class="card plain">
+      <button style="width:100%" data-add-session>あとから記録する</button>
     </div>
     <div class="card">
       <h2>最近の記録</h2>
@@ -490,6 +483,30 @@ dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color:
   </div>
 </dialog>
 
+<!-- 学習記録 -->
+<dialog id="dlgSession">
+  <h3 id="ssTitle">学習を記録</h3>
+  <label class="f"><span>教材・教科</span><select id="ssTarget"></select></label>
+  <label class="f"><span>日付</span><input type="date" id="ssDate"></label>
+  <div class="row" style="margin-bottom:8px"><span class="muted grow">時間の入れ方</span>
+    <div class="seg" id="ssMode"><button data-v="dur" class="on">時間</button><button data-v="range">開始〜終了</button></div>
+  </div>
+  <div class="row" id="ssDur" style="margin-bottom:8px">
+    <input type="number" id="ssH" min="0" inputmode="numeric" style="width:80px"><span>時間</span>
+    <input type="number" id="ssM" min="0" max="59" inputmode="numeric" style="width:80px"><span>分</span>
+  </div>
+  <div class="row" id="ssRange" style="margin-bottom:12px" hidden>
+    <input type="time" id="ssFrom" class="grow"><span>〜</span><input type="time" id="ssTo" class="grow">
+  </div>
+  <div class="chips" id="ssQuick"><button data-add="15">+15分</button><button data-add="30">+30分</button><button data-add="60">+1時間</button></div>
+  <label class="f"><span>メモ（任意）</span><input id="ssMemo"></label>
+  <div class="dlg-actions">
+    <button class="danger" id="ssDelete" hidden>削除</button>
+    <button id="ssCancel">キャンセル</button>
+    <button class="primary" id="ssSave">記録する</button>
+  </div>
+</dialog>
+
 <!-- 教科 -->
 <dialog id="dlgSubject">
   <h3>教科</h3>
@@ -682,17 +699,15 @@ function renderHome() {
 
 function renderTimerView() {
   const opts = bookOptions(false);
-  const tb = $('#timerBook'), mb = $('#manualBook');
+  const tb = $('#timerBook');
   const curT = S.timer ? (S.timer.bookId ? 'b:' + S.timer.bookId : 's:' + S.timer.subjectId) : tb.value;
   tb.innerHTML = '<option value="">学習する教材・教科を選択</option>' + opts; tb.value = curT || '';
-  const curM = mb.value; mb.innerHTML = opts; if (curM) mb.value = curM;
-  if (!$('#manualDate').value) $('#manualDate').value = ymd();
   updateTimerUi();
 
   const recent = [...S.sessions].sort((a, b) => (b.endedAt || 0) - (a.endedAt || 0) || b.date.localeCompare(a.date)).slice(0, 30);
   $('#sessionList').innerHTML = recent.length ? recent.map(s => {
     const b = s.bookId ? bookById(s.bookId) : null;
-    return `<li><span class="dot" style="background:${esc(subjColor(s.subjectId))}"></span><div class="grow"><div>${esc(b ? b.title : subjName(s.subjectId))}</div><div class="muted">${fmtDateJa(s.date)} ・ ${esc(subjName(s.subjectId))}${s.memo ? ' ・ ' + esc(s.memo) : ''}</div></div><b>${fmtMin(s.minutes)}</b><button class="small danger" data-del-session="${s.id}" aria-label="削除">×</button></li>`;
+    return `<li><span class="dot" style="background:${esc(subjColor(s.subjectId))}"></span><div class="grow"><div>${esc(b ? b.title : subjName(s.subjectId))}</div><div class="muted">${fmtDateJa(s.date)} ・ ${esc(subjName(s.subjectId))}${s.memo ? ' ・ ' + esc(s.memo) : ''}</div></div><b>${fmtMin(s.minutes)}</b><button class="small" data-edit-session="${s.id}">編集</button></li>`;
   }).join('') : '<li class="empty">記録はまだありません。</li>';
 }
 
@@ -826,20 +841,67 @@ $('#btnStop').onclick = stopTimer;
 $('#btnCancel').onclick = () => { if (confirm('計測中の時間を破棄しますか？')) { S.timer = null; save(); render(); } };
 setInterval(() => { if (S.timer) { updateTimerUi(); if ($('#view-home').classList.contains('active')) { $('#statToday').textContent = fmtMin(sumMinutes(s => s.date === ymd()) + runningMinutes()); } } }, 1000);
 
-$('#btnManual').onclick = () => {
-  const t = parseTarget($('#manualBook').value);
-  const m = Number($('#manualMin').value);
-  const d = $('#manualDate').value;
+/* あとから記録（追加・編集） */
+let editingSession = null, ssMode = 'dur';
+function setSsMode(m) {
+  ssMode = m;
+  $$('#ssMode button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
+  $('#ssDur').hidden = m !== 'dur'; $('#ssQuick').hidden = m !== 'dur'; $('#ssRange').hidden = m !== 'range';
+}
+function openSessionDialog(sess, date) {
+  if (!S.subjects.length) return toast('先に教科を追加してください');
+  editingSession = sess || null;
+  $('#ssTitle').textContent = sess ? '記録を編集' : '学習を記録';
+  $('#ssSave').textContent = sess ? '保存' : '記録する';
+  const sel = $('#ssTarget'); sel.innerHTML = bookOptions(false);
+  const want = sess ? (sess.bookId && bookById(sess.bookId) ? 'b:' + sess.bookId : 's:' + sess.subjectId) : $('#timerBook').value;
+  sel.value = want && [...sel.options].some(o => o.value === want) ? want : sel.options[0].value;
+  $('#ssDate').value = sess?.date ?? date ?? ymd();
+  $('#ssDate').max = ymd();
+  const m = sess?.minutes ?? 0;
+  $('#ssH').value = m ? Math.floor(m / 60) : ''; $('#ssM').value = m ? m % 60 : '';
+  $('#ssFrom').value = ''; $('#ssTo').value = '';
+  $('#ssMemo').value = sess?.memo ?? '';
+  $('#ssDelete').hidden = !sess;
+  setSsMode('dur');
+  $('#dlgSession').showModal();
+}
+function ssMinutes() {
+  if (ssMode === 'dur') return (Number($('#ssH').value) || 0) * 60 + (Number($('#ssM').value) || 0);
+  const f = $('#ssFrom').value, t = $('#ssTo').value; if (!f || !t) return 0;
+  const toMin = v => { const [h, mm] = v.split(':').map(Number); return h * 60 + mm; };
+  let d = toMin(t) - toMin(f); if (d < 0) d += 1440; return d;
+}
+$('#ssMode').onclick = e => { const b = e.target.closest('button'); if (b) setSsMode(b.dataset.v); };
+$('#ssQuick').onclick = e => {
+  const b = e.target.closest('[data-add]'); if (!b) return;
+  const m = ssMinutes() + Number(b.dataset.add);
+  $('#ssH').value = Math.floor(m / 60); $('#ssM').value = m % 60;
+};
+$('#ssCancel').onclick = () => $('#dlgSession').close();
+$('#ssSave').onclick = () => {
+  const t = parseTarget($('#ssTarget').value), d = $('#ssDate').value, m = Math.round(ssMinutes());
   if (!t) return toast('教材か教科を選んでください');
-  if (!(m > 0)) return toast('分数を入力してください');
   if (!d) return toast('日付を入力してください');
-  S.sessions.push({ id: uid(), ...t, date: d, minutes: Math.round(m), memo: $('#manualMemo').value.trim(), endedAt: Date.now() });
-  $('#manualMin').value = ''; $('#manualMemo').value = '';
-  save(); render(); toast('記録しました');
+  if (!(m > 0)) return toast('勉強した時間を入力してください');
+  if (m > 1440) return toast('24時間を超える記録はできません');
+  const data = { ...t, date: d, minutes: m, memo: $('#ssMemo').value.trim() };
+  const wasEdit = !!editingSession;
+  if (wasEdit) Object.assign(editingSession, data);
+  else S.sessions.push({ id: uid(), ...data, endedAt: Date.now() });
+  save(); $('#dlgSession').close(); render();
+  toast(wasEdit ? '記録を更新しました' : `${fmtDateJa(d)}に${fmtMin(m)}を記録しました`);
+};
+$('#ssDelete').onclick = () => {
+  if (editingSession && confirm('この記録を削除しますか？')) {
+    S.sessions = S.sessions.filter(s => s !== editingSession); save(); $('#dlgSession').close(); render(); toast('削除しました');
+  }
 };
 document.addEventListener('click', e => {
-  const del = e.target.closest('[data-del-session]');
-  if (del && confirm('この記録を削除しますか？')) { S.sessions = S.sessions.filter(s => s.id !== del.dataset.delSession); save(); render(); }
+  const add = e.target.closest('[data-add-session]');
+  if (add) openSessionDialog(null, add.dataset.addSession || undefined);
+  const ed = e.target.closest('[data-edit-session]');
+  if (ed) openSessionDialog(S.sessions.find(s => s.id === ed.dataset.editSession));
 });
 
 /* ========== バーコード ========== */
@@ -1225,9 +1287,9 @@ function renderCalendar() {
   $('#cal').innerHTML = html;
   const ts = tests[calSel] || [];
   const ss = S.sessions.filter(s => s.date === calSel);
-  $('#calDetail').innerHTML = `<div class="row"><b class="grow">${fmtDateJa(calSel)}</b><button class="small" id="calAddTest">この日にテストを追加</button></div>
+  $('#calDetail').innerHTML = `<div class="row"><b class="grow">${fmtDateJa(calSel)}</b><button class="small" data-add-session="${calSel}">記録を追加</button><button class="small" id="calAddTest">テストを追加</button></div>
     <ul class="list">${ts.map(t => `<li><span class="countdown${daysUntil(t.date) <= 7 && t.date >= today ? ' soon' : ''}">${esc(t.name)}</span><span class="grow muted">${(t.results || []).map(r => esc(subjName(r.subjectId))).join('・')}</span><button class="small" data-edit-test="${t.id}">編集</button></li>`).join('')}
-    ${ss.map(s => `<li><span class="dot" style="background:${esc(subjColor(s.subjectId))}"></span><span class="grow">${esc(s.bookId && bookById(s.bookId) ? bookById(s.bookId).title : subjName(s.subjectId))}</span><b>${fmtMin(s.minutes)}</b></li>`).join('')}
+    ${ss.map(s => `<li><span class="dot" style="background:${esc(subjColor(s.subjectId))}"></span><span class="grow">${esc(s.bookId && bookById(s.bookId) ? bookById(s.bookId).title : subjName(s.subjectId))}</span><b>${fmtMin(s.minutes)}</b><button class="small" data-edit-session="${s.id}">編集</button></li>`).join('')}
     ${!ts.length && !ss.length ? '<li class="empty">予定・記録はありません</li>' : ''}</ul>`;
   $('#calAddTest').onclick = () => { openTestDialog(null); $('#tsDate').value = calSel; };
 }
