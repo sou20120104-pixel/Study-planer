@@ -5,157 +5,227 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Study Planner</title>
 <meta name="description" content="参考書のバーコードで勉強時間を記録し、教科・テストを管理し、Claudeで学習計画を相談できるスタディプランナー">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
+/* マークシート：白い用紙・桃赤の印刷インク・鉛筆の黒・採点の赤ペン */
 :root {
-  --bg: #f6f7fb;
-  --panel: #ffffff;
-  --text: #1d2330;
-  --muted: #6b7385;
-  --line: #e3e6ee;
-  --accent: #3f6ee8;
-  --accent-weak: #e8eefc;
-  --danger: #d64545;
-  --ok: #2f9e6b;
-  --shadow: 0 1px 3px rgba(20, 30, 60, .08);
-  --radius: 12px;
+  --paper: #ffffff; --sheet: #fdf1f2; --rule: #f1c6cc;
+  --ink: #e06c7a; --ink-strong: #b3364a;
+  --lead: #26272c; --muted: #6d686e; --pen: #d3203a; --on-lead: #ffffff;
+  --accent: var(--ink-strong); --accent-weak: var(--sheet);
+  --danger: var(--pen);
+  --hand: "Klee One", "Zen Kaku Gothic New", serif;
+  --ui: "Zen Kaku Gothic New", system-ui, -apple-system, "Hiragino Sans", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #12151c; --panel: #1b2029; --text: #e7eaf0; --muted: #98a0b2;
-    --line: #2c3240; --accent: #7a9cff; --accent-weak: #232c44; --shadow: none;
+    --paper: #1b1c20; --sheet: #2b2227; --rule: #4a3439; --ink: #e88a96; --ink-strong: #f2a5af;
+    --lead: #ece9ea; --muted: #a39da2; --pen: #ff6478; --on-lead: #1b1c20;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #12151c; --panel: #1b2029; --text: #e7eaf0; --muted: #98a0b2;
-  --line: #2c3240; --accent: #7a9cff; --accent-weak: #232c44; --shadow: none;
+  --paper: #1b1c20; --sheet: #2b2227; --rule: #4a3439; --ink: #e88a96; --ink-strong: #f2a5af;
+  --lead: #ece9ea; --muted: #a39da2; --pen: #ff6478; --on-lead: #1b1c20;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
-  background: var(--bg); color: var(--text);
-  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
-  font-size: 15px; line-height: 1.6;
-  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  background: var(--paper); color: var(--lead); font-family: var(--ui);
+  font-size: 15px; line-height: 1.7; letter-spacing: .02em;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
 }
+a { color: var(--ink-strong); }
+:focus-visible { outline: 2px solid var(--ink-strong); outline-offset: 2px; }
+
 header.top {
-  position: sticky; top: 0; z-index: 10;
-  background: var(--panel); border-bottom: 1px solid var(--line);
-  padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 0; z-index: 10; background: var(--paper);
+  border-bottom: 1.5px solid var(--ink); padding: 10px 16px;
+  display: flex; align-items: center; gap: 10px;
 }
-header.top h1 { font-size: 17px; margin: 0; flex: 1; }
+header.top h1 { margin: 0; flex: 1; font-size: 18px; font-weight: 700; letter-spacing: .04em; }
+header.top h1 small { font-weight: 400; color: var(--ink-strong); font-size: 12px; margin-left: 8px; letter-spacing: 0; }
+.icon-btn { min-height: 36px; padding: 4px 10px; border-color: var(--rule); font-size: 13px; }
 .timer-chip {
-  display: none; font-variant-numeric: tabular-nums; font-size: 13px;
-  background: var(--accent-weak); color: var(--accent); padding: 3px 10px; border-radius: 99px; cursor: pointer;
+  display: none; font-family: var(--hand); font-size: 15px; cursor: pointer;
+  border: 1.5px solid var(--lead); border-radius: 999px; padding: 1px 12px;
 }
 .timer-chip.on { display: inline-block; }
-main { max-width: 860px; margin: 0 auto; padding: 16px; }
+
+main { max-width: 760px; margin: 0 auto; padding: 18px 16px; }
 section.view { display: none; }
 section.view.active { display: block; }
-.card {
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: var(--shadow); padding: 16px; margin-bottom: 14px;
-}
-.card h2 { font-size: 15px; margin: 0 0 10px; }
+
+/* 解答欄のような枠 */
+.card { border: 1.5px solid var(--ink); border-radius: 4px; margin-bottom: 18px; padding: 0 14px 14px; }
+.card > h2, .card .head { margin: 0 -14px 12px; padding: 6px 14px; background: var(--sheet); border-bottom: 1px solid var(--rule); }
+.card > h2, .card .head h2 { font-size: 14px; font-weight: 700; color: var(--ink-strong); letter-spacing: .08em; }
+.card .head h2 { margin: 0; }
+.card .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card .head h2 { flex: 1; }
+.card.plain { border: 0; padding: 0; }
+
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
 .muted { color: var(--muted); font-size: 13px; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.stat { background: var(--accent-weak); border-radius: 10px; padding: 10px; text-align: center; }
-.stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
-.stat span { font-size: 12px; color: var(--muted); }
+.empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); }
+.stat { text-align: center; padding: 6px 4px; border-left: 1px solid var(--rule); }
+.stat:first-child { border-left: 0; }
+.stat b { display: block; font-family: var(--hand); font-weight: 600; font-size: clamp(18px, 5.4vw, 28px); line-height: 1.4; white-space: nowrap; }
+.stat span { font-size: 12px; color: var(--ink-strong); }
+
 button, .btn {
-  font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);
-  border-radius: 8px; padding: 8px 14px; cursor: pointer; min-height: 40px;
+  font: inherit; font-size: 14px; color: var(--lead); background: transparent;
+  border: 1.5px solid var(--lead); border-radius: 999px; padding: 6px 16px; min-height: 40px; cursor: pointer;
 }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.danger { color: var(--danger); }
-button.small { padding: 4px 10px; min-height: 32px; font-size: 13px; }
-button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--lead); color: var(--on-lead); }
+button.danger { border-color: var(--pen); color: var(--pen); }
+button.small { min-height: 32px; padding: 2px 12px; font-size: 13px; }
+button:disabled { opacity: .35; cursor: default; }
+button:not(:disabled):active { transform: translateY(1px); }
+
 input, select, textarea {
-  font: inherit; color: var(--text); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-height: 40px; width: 100%;
+  font: inherit; color: var(--lead); background: var(--paper); width: 100%; min-height: 40px;
+  border: 1px solid var(--ink); border-radius: 4px; padding: 7px 10px;
 }
 textarea { min-height: 80px; resize: vertical; }
-label.f { display: block; margin-bottom: 10px; }
-label.f > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 3px; }
+label.f { display: block; margin-bottom: 12px; }
+label.f > span { display: block; font-size: 12px; color: var(--ink-strong); margin-bottom: 2px; }
+
 .list { list-style: none; margin: 0; padding: 0; }
-.list li { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.list li { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--rule); }
 .list li:last-child { border-bottom: 0; }
-.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--accent-weak); color: var(--text); }
-.empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
-.big-timer { font-size: 52px; font-variant-numeric: tabular-nums; text-align: center; letter-spacing: 1px; margin: 8px 0 4px; }
-.timer-target { text-align: center; color: var(--muted); margin-bottom: 12px; }
+.dot { width: 10px; height: 15px; border-radius: 50%; flex: none; }
+.tag { display: inline-block; font-size: 12px; padding: 0 8px; border: 1px solid var(--rule); border-radius: 999px; }
+.countdown { font-family: var(--hand); font-weight: 600; font-size: 17px; white-space: nowrap; }
+.countdown.soon { color: var(--pen); }
+
+/* マーク（楕円） */
+.mark {
+  display: inline-grid; place-items: center; width: 22px; height: 32px; flex: none;
+  border: 1.5px solid var(--ink); border-radius: 50%; font-size: 11px; color: var(--ink-strong);
+}
+.mark.on { background: var(--lead); border-color: var(--lead); color: var(--on-lead);
+  background-image: radial-gradient(circle at 35% 30%, rgba(255,255,255,.18), transparent 55%); }
+
+.scan-btn { width: 100%; min-height: 56px; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.scan-btn .bars { width: 34px; height: 22px; background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 4px, currentColor 4px 5px, transparent 5px 8px); }
+
+.big-timer { font-family: var(--hand); font-weight: 600; font-size: 60px; text-align: center; margin: 4px 0 0; font-variant-numeric: tabular-nums; }
+.timer-target { text-align: center; color: var(--ink-strong); margin-bottom: 14px; }
 .center { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
-.scan-btn { width: 100%; font-size: 16px; padding: 14px; }
+
 nav.tabs {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
-  background: var(--panel); border-top: 1px solid var(--line);
-  display: grid; grid-template-columns: repeat(6, 1fr);
+  position: fixed; inset: auto 0 0 0; z-index: 10; background: var(--paper);
+  border-top: 1.5px solid var(--ink); display: grid; grid-template-columns: repeat(6, 1fr);
   padding-bottom: env(safe-area-inset-bottom);
 }
 nav.tabs button {
-  border: 0; border-radius: 0; background: none; min-height: 58px; padding: 6px 2px;
-  font-size: 11px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 0; border-radius: 0; min-height: 60px; padding: 6px 0 4px; font-size: 11px; color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
 }
-nav.tabs button svg { width: 22px; height: 22px; }
-nav.tabs button.active { color: var(--accent); }
+nav.tabs button .mark { width: 16px; height: 24px; transition: background-color .15s; }
+nav.tabs button.active { color: var(--lead); font-weight: 700; }
+nav.tabs button.active .mark { background: var(--lead); border-color: var(--lead); }
+
 dialog {
-  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text);
-  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 18px;
+  border: 1.5px solid var(--ink); border-radius: 4px; background: var(--paper); color: var(--lead);
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 16px;
 }
-dialog::backdrop { background: rgba(0, 0, 0, .45); }
-dialog h3 { margin: 0 0 12px; font-size: 16px; }
+dialog::backdrop { background: rgba(38, 39, 44, .5); }
+dialog h3 { margin: -16px -16px 14px; padding: 8px 16px; font-size: 15px; color: var(--ink-strong); background: var(--sheet); border-bottom: 1px solid var(--rule); }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-#scanVideo, #scanReader { width: 100%; border-radius: 8px; background: #000; min-height: 200px; }
+#scanVideo, #scanReader { width: 100%; border-radius: 4px; background: #000; min-height: 200px; }
 #scanVideo { display: block; max-height: 50vh; object-fit: cover; }
-.chart svg { width: 100%; height: auto; display: block; }
+
+.chart svg { width: 100%; height: auto; display: block; color: var(--ink); }
 .chart text { fill: var(--muted); font-size: 10px; }
 .bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
 .bar-row .name { width: 72px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bar-row .track { flex: 1; height: 12px; background: var(--accent-weak); border-radius: 99px; overflow: hidden; }
-.bar-row .fill { height: 100%; border-radius: 99px; }
-.bar-row .val { width: 64px; text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+.bar-row .track { flex: 1; height: 10px; border-bottom: 1px solid var(--rule); }
+.bar-row .fill { height: 100%; }
+.bar-row .val { width: 70px; text-align: right; font-family: var(--hand); flex: none; }
+
+.seg { display: inline-flex; border: 1.5px solid var(--lead); border-radius: 999px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; min-height: 30px; padding: 0 12px; font-size: 13px; }
+.seg button.on { background: var(--lead); color: var(--on-lead); }
+.score-grid { display: grid; grid-template-columns: 1fr 64px 64px 64px 34px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.score-grid input, .score-grid select { padding: 5px; min-height: 36px; }
+
+/* カレンダー */
+.cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cal-head b { flex: 1; text-align: center; font-family: var(--hand); font-size: 20px; font-weight: 600; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+.cal .wd { font-size: 11px; text-align: center; color: var(--ink-strong); padding: 2px 0; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); background: var(--sheet); }
+.cal .day {
+  min-height: 64px; padding: 2px 3px; border: 0; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+  border-radius: 0; background: none; font-size: 11px; text-align: left; display: flex; flex-direction: column; gap: 1px; min-width: 0;
+}
+.cal .day.out { opacity: .35; }
+.cal .day.sel { background: var(--sheet); }
+.cal .num { font-family: var(--hand); font-size: 14px; font-weight: 600; width: 24px; height: 24px; display: grid; place-items: center; }
+.cal .today .num { background: var(--lead); color: var(--on-lead); border-radius: 50%; }
+.cal .has-test .num { border: 2px solid var(--pen); border-radius: 50%; color: var(--pen); }
+.cal .today.has-test .num { color: var(--on-lead); }
+.cal .t { color: var(--pen); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+.cal .m { color: var(--muted); font-family: var(--hand); line-height: 1.2; margin-top: auto; }
+.cal .bar { height: 3px; background: var(--lead); opacity: .55; }
+
+/* 小テスト */
+.q { padding: 12px 0; border-bottom: 1px dashed var(--rule); position: relative; }
+.q:last-child { border-bottom: 0; }
+.q .qt { display: flex; gap: 8px; margin-bottom: 8px; }
+.q .qn { font-family: var(--hand); font-weight: 600; color: var(--ink-strong); flex: none; width: 34px; height: 34px; display: grid; place-items: center; position: relative; }
+.q .choice { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-radius: 4px; padding: 6px 4px; min-height: 44px; font-size: 14px; }
+.q .choice:hover:not(:disabled) { background: var(--sheet); }
+.q .choice:disabled { opacity: 1; cursor: default; }
+.q .choice.correct { color: var(--pen); font-weight: 700; }
+.grade { position: absolute; inset: -4px; font-family: var(--hand); color: var(--pen); font-size: 40px; line-height: 1; display: grid; place-items: center; pointer-events: none; animation: stamp .25s ease-out; }
+@keyframes stamp { from { transform: scale(1.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.expl { margin-top: 6px; padding: 8px 10px; border-left: 3px solid var(--pen); background: var(--sheet); font-size: 14px; }
+.score-big { font-family: var(--hand); color: var(--pen); font-size: 40px; font-weight: 600; text-align: center; line-height: 1.2; }
+
 .chat { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow-y: auto; margin-bottom: 10px; }
-.msg { padding: 10px 12px; border-radius: 10px; white-space: normal; word-wrap: break-word; }
-.msg.user { background: var(--accent-weak); align-self: flex-end; max-width: 85%; white-space: pre-wrap; }
-.msg.assistant { background: var(--bg); border: 1px solid var(--line); }
-.msg.assistant h4 { margin: 8px 0 4px; font-size: 14px; }
-.msg.assistant ul { margin: 4px 0; padding-left: 20px; }
-.msg.assistant p { margin: 4px 0; }
-.msg.error { color: var(--danger); border: 1px solid var(--danger); }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.chips button { font-size: 13px; min-height: 32px; padding: 4px 10px; border-radius: 99px; }
+.msg { padding: 8px 12px; word-wrap: break-word; }
+.msg.user { align-self: flex-end; max-width: 85%; white-space: pre-wrap; border: 1px solid var(--rule); border-radius: 12px 12px 2px 12px; }
+.msg.assistant { border-left: 3px solid var(--lead); padding-left: 12px; }
+.msg h4 { margin: 8px 0 2px; font-size: 14px; }
+.msg ul { margin: 4px 0; padding-left: 20px; }
+.msg p { margin: 4px 0; }
+.msg.error { color: var(--pen); border-color: var(--pen); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.chips button { font-size: 13px; min-height: 32px; padding: 2px 12px; border-color: var(--ink); }
+
 .toast {
-  position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%);
-  background: #222a; color: #fff; background: rgba(30, 35, 45, .92); padding: 10px 16px; border-radius: 10px;
+  position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: var(--lead); color: var(--on-lead); padding: 8px 18px; border-radius: 999px;
   font-size: 14px; z-index: 100; max-width: calc(100vw - 32px); opacity: 0; transition: opacity .2s; pointer-events: none;
 }
 .toast.show { opacity: 1; }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.seg button { border: 0; border-radius: 0; min-height: 34px; padding: 4px 12px; font-size: 13px; }
-.seg button.on { background: var(--accent); color: #fff; }
-.score-grid { display: grid; grid-template-columns: 1fr 70px 70px 70px 36px; gap: 6px; align-items: center; margin-bottom: 6px; }
-.score-grid input, .score-grid select { padding: 6px; min-height: 36px; }
-.countdown { font-weight: 700; color: var(--accent); white-space: nowrap; }
 @media (max-width: 480px) {
-  .big-timer { font-size: 44px; }
-  .score-grid { grid-template-columns: 1fr 56px 56px 56px 32px; }
+  .big-timer { font-size: 50px; }
+  .score-grid { grid-template-columns: 1fr 52px 52px 52px 30px; }
+  .cal .day { min-height: 56px; }
 }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <header class="top">
-  <h1>Study Planner</h1>
+  <h1>Study Planner<small id="hdrDate"></small></h1>
   <span class="timer-chip" id="timerChip" title="タイマー画面へ"></span>
+  <button class="icon-btn" id="btnSettings" aria-label="設定">設定</button>
 </header>
 
 <main>
   <!-- ホーム -->
   <section class="view active" id="view-home">
-    <div class="card">
-      <button class="primary scan-btn" data-action="scan">バーコードを読み取って勉強開始</button>
-      <p class="muted" style="margin:8px 0 0">参考書裏表紙の上段（978から始まるISBN）を読み取ってください。未登録の本はその場で登録できます。</p>
+    <div class="card plain">
+      <button class="primary scan-btn" data-action="scan"><span class="bars" aria-hidden="true"></span>参考書を読み取って勉強を始める</button>
+      <p class="muted" style="margin:6px 0 0;text-align:center">裏表紙の上段（978…）を読み取ります。未登録の本はその場で登録できます。</p>
     </div>
     <div class="card">
       <h2>学習時間</h2>
@@ -217,15 +287,15 @@ dialog h3 { margin: 0 0 12px; font-size: 16px; }
   <!-- 参考書・教科 -->
   <section class="view" id="view-books">
     <div class="card">
-      <div class="row" style="margin-bottom:8px">
-        <h2 class="grow" style="margin:0">教科</h2>
+      <div class="head">
+        <h2>教科</h2>
         <button class="small" id="btnAddSubject">＋ 教科</button>
       </div>
       <ul class="list" id="subjectList"></ul>
     </div>
     <div class="card">
-      <div class="row" style="margin-bottom:8px">
-        <h2 class="grow" style="margin:0">参考書・教材</h2>
+      <div class="head">
+        <h2>参考書・教材</h2>
         <button class="small" data-action="scan-register">読取で登録</button>
         <button class="small" id="btnAddBook">＋ 手入力</button>
       </div>
@@ -239,8 +309,19 @@ dialog h3 { margin: 0 0 12px; font-size: 16px; }
   <!-- テスト -->
   <section class="view" id="view-tests">
     <div class="card">
-      <div class="row" style="margin-bottom:8px">
-        <h2 class="grow" style="margin:0">テスト</h2>
+      <h2>カレンダー</h2>
+      <div class="cal-head">
+        <button class="small" id="calPrev" aria-label="前の月">‹</button>
+        <b id="calTitle"></b>
+        <button class="small" id="calToday">今月</button>
+        <button class="small" id="calNext" aria-label="次の月">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
+      <div id="calDetail" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <div class="head">
+        <h2>テスト</h2>
         <div class="seg" id="testSeg">
           <button class="on" data-v="upcoming">これから</button>
           <button data-v="past">過去</button>
@@ -255,10 +336,43 @@ dialog h3 { margin: 0 0 12px; font-size: 16px; }
     </div>
   </section>
 
+  <!-- 小テスト -->
+  <section class="view" id="view-quiz">
+    <div class="card" id="quizSetup">
+      <h2>小テストを作る</h2>
+      <div class="row">
+        <label class="f grow"><span>教科</span><select id="qzSubject"></select></label>
+        <label class="f grow"><span>教材（任意）</span><select id="qzBook"></select></label>
+      </div>
+      <label class="f"><span>範囲・テーマ</span><input id="qzTopic" placeholder="例: 二次関数の最大・最小、関係代名詞"></label>
+      <div class="row">
+        <label class="f grow"><span>問題数</span><select id="qzCount"><option>3</option><option selected>5</option><option>10</option></select></label>
+        <label class="f grow"><span>難易度</span><select id="qzLevel"><option>基礎</option><option selected>標準</option><option>応用</option></select></label>
+      </div>
+      <button class="primary" id="btnQuizMake" style="width:100%">問題を作る</button>
+    </div>
+    <div class="card" id="quizBox" hidden>
+      <div class="head"><h2 id="quizTitle">小テスト</h2><button class="small" id="btnQuizClose">閉じる</button></div>
+      <div id="quizResult"></div>
+      <div id="quizQs"></div>
+      <div class="center" style="margin-top:10px"><button class="primary" id="btnQuizGrade">採点する</button></div>
+    </div>
+    <div class="card">
+      <h2>解説してもらう</h2>
+      <textarea id="explInput" placeholder="わからない問題や用語を入力"></textarea>
+      <div class="row" style="margin-top:8px;justify-content:flex-end"><button class="primary" id="btnExplain">解説する</button></div>
+      <div id="explOut"></div>
+    </div>
+    <div class="card">
+      <h2>小テストの記録</h2>
+      <ul class="list" id="quizHistory"></ul>
+    </div>
+  </section>
+
   <!-- AI -->
   <section class="view" id="view-ai">
     <div class="card">
-      <h2>AIに相談（Claude）</h2>
+      <h2>AIに相談</h2>
       <p class="muted" id="aiKeyNote" style="margin-top:0"></p>
       <div class="chips">
         <button data-prompt="plan">今週の学習計画を作って</button>
@@ -306,6 +420,13 @@ dialog h3 { margin: 0 0 12px; font-size: 16px; }
     </div>
     <div class="card">
       <h2>目標・表示</h2>
+      <label class="f"><span>AIの回答の長さ（短いほどトークンを節約）</span>
+        <select id="aiLength">
+          <option value="short">短め（要点のみ）</option>
+          <option value="normal">標準</option>
+          <option value="long">長め</option>
+        </select>
+      </label>
       <label class="f"><span>1日の目標学習時間（分）</span>
         <input type="number" id="dailyGoal" min="0" step="10">
       </label>
@@ -331,12 +452,12 @@ dialog h3 { margin: 0 0 12px; font-size: 16px; }
 </main>
 
 <nav class="tabs" id="tabs">
-  <button data-view="home" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>ホーム</button>
-  <button data-view="timer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>タイマー</button>
-  <button data-view="books"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19a2 2 0 0 0 2 2h13"/></svg>教材</button>
-  <button data-view="tests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>テスト</button>
-  <button data-view="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/></svg>AI</button>
-  <button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>設定</button>
+  <button data-view="home" class="active"><span class="mark" aria-hidden="true"></span>ホーム</button>
+  <button data-view="timer"><span class="mark" aria-hidden="true"></span>タイマー</button>
+  <button data-view="books"><span class="mark" aria-hidden="true"></span>教材</button>
+  <button data-view="tests"><span class="mark" aria-hidden="true"></span>テスト</button>
+  <button data-view="quiz"><span class="mark" aria-hidden="true"></span>小テスト</button>
+  <button data-view="ai"><span class="mark" aria-hidden="true"></span>AI相談</button>
 </nav>
 
 <!-- スキャナ -->
@@ -421,9 +542,9 @@ function lsDel(k) { try { localStorage.removeItem(k); } catch {} }
 function freshState() {
   return {
     subjects: DEFAULT_SUBJECTS.map(([name, color]) => ({ id: uid(), name, color })),
-    books: [], sessions: [], tests: [],
+    books: [], sessions: [], tests: [], quizzes: [],
     timer: null,
-    settings: { dailyGoal: 120 }
+    settings: { dailyGoal: 120, aiLength: 'short' }
   };
 }
 function loadState() {
@@ -431,7 +552,7 @@ function loadState() {
     const raw = lsGet(STORE_KEY, null);
     if (!raw) return freshState();
     const s = JSON.parse(raw);
-    return Object.assign(freshState(), s, { settings: Object.assign({ dailyGoal: 120 }, s.settings || {}) });
+    return Object.assign(freshState(), s, { settings: Object.assign({ dailyGoal: 120, aiLength: 'short' }, s.settings || {}) });
   } catch { return freshState(); }
 }
 let S = loadState();
@@ -475,6 +596,8 @@ function showView(name) {
 }
 $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showView(b.dataset.view); });
 $('#timerChip').addEventListener('click', () => showView('timer'));
+$('#btnSettings').addEventListener('click', () => showView('settings'));
+$('#hdrDate').textContent = fmtDateJa(ymd());
 
 /* ========== 描画 ========== */
 function bookOptions(includeNone) {
@@ -504,7 +627,7 @@ function targetLabel(t) {
 function subjectOptions(sel) { return S.subjects.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join(''); }
 
 function render() {
-  renderHome(); renderTimerView(); renderBooks(); renderTests(); renderAi(); renderSettings();
+  renderHome(); renderTimerView(); renderBooks(); renderTests(); renderCalendar(); renderQuizSetup(); renderQuiz(); renderAi(); renderSettings();
 }
 
 function renderHome() {
@@ -520,7 +643,7 @@ function renderHome() {
   const upcoming = S.tests.filter(t => t.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
   $('#homeTests').innerHTML = upcoming.length ? upcoming.map(t => {
     const d = daysUntil(t.date);
-    return `<li><div class="grow"><div>${esc(t.name)}</div><div class="muted">${fmtDateJa(t.date)}</div></div><span class="countdown">${d === 0 ? '今日' : 'あと' + d + '日'}</span></li>`;
+    return `<li><div class="grow"><div>${esc(t.name)}</div><div class="muted">${fmtDateJa(t.date)}</div></div><span class="countdown${d <= 7 ? ' soon' : ''}">${d === 0 ? '今日' : 'あと' + d + '日'}</span></li>`;
   }).join('') : '<li class="empty">予定されたテストはありません。テストタブから追加できます。</li>';
 
   // 14日の積み上げ棒グラフ
@@ -603,7 +726,7 @@ function renderTests() {
       return `<span class="tag" style="border-left:3px solid ${esc(subjColor(r.subjectId))}">${esc(subjName(r.subjectId))}${sc}${tg}</span>`;
     }).join(' ');
     const right = testMode === 'upcoming'
-      ? `<span class="countdown">${d === 0 ? '今日' : 'あと' + d + '日'}</span>`
+      ? `<span class="countdown${d <= 7 ? ' soon' : ''}">${d === 0 ? '今日' : 'あと' + d + '日'}</span>`
       : (scored.length ? `<b>${Math.round(sum / mx * 100)}%</b>` : '<span class="muted">未入力</span>');
     return `<li style="align-items:flex-start"><div class="grow"><div>${esc(t.name)} <span class="muted">${fmtDateJa(t.date)}</span></div><div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">${subj}</div>${t.memo ? `<div class="muted" style="margin-top:4px">${esc(t.memo)}</div>` : ''}</div>${right}<button class="small" data-edit-test="${t.id}">編集</button></li>`;
   }).join('') : `<li class="empty">${testMode === 'upcoming' ? 'これからのテストはありません。' : '過去のテストはありません。'}</li>`;
@@ -650,6 +773,7 @@ function renderSettings() {
   else $('#apiModelCustom').value = m;
   const dg = $('#dailyGoal'); if (document.activeElement !== dg) dg.value = S.settings.dailyGoal;
   $('#theme').value = lsGet(KEY_THEME, '');
+  $('#aiLength').value = S.settings.aiLength || 'short';
 }
 
 /* ========== タイマー ========== */
@@ -975,11 +1099,11 @@ function buildContext() {
     lines.push(`- ${s.name}: 累計${sumMinutes(x => x.subjectId === s.id)}分`);
     for (const b of S.books.filter(b => b.subjectId === s.id)) lines.push(`  - ${b.title}${b.memo ? `（${b.memo}）` : ''}: 累計${sumMinutes(x => x.bookId === b.id)}分`);
   }
-  lines.push('\n## 直近14日の学習時間（分）');
+  lines.push('\n## 直近14日の学習時間（分、記載なしの日は0）');
   const days = minutesByDay(addDays(new Date(), -13), 14);
   for (const [d, m] of Object.entries(days)) {
     const parts = Object.entries(m).map(([sid, v]) => `${subjName(sid)}${v}`);
-    lines.push(`- ${d}: ${parts.length ? parts.join(', ') : '0'}`);
+    if (parts.length) lines.push(`- ${d}: ${parts.join(', ')}`);
   }
   const fmtRes = t => (t.results || []).map(r => `${subjName(r.subjectId)}${r.score !== '' && r.score != null ? ` ${r.score}/${r.max}` : ''}${r.target ? `（目標${r.target}）` : ''}`).join(', ');
   const up = S.tests.filter(t => t.date >= today).sort((a, b) => a.date.localeCompare(b.date));
@@ -988,6 +1112,8 @@ function buildContext() {
   const past = S.tests.filter(t => t.date < today).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
   lines.push('\n## 過去のテスト結果');
   lines.push(...(past.length ? past.map(t => `- ${t.date} ${t.name}: ${fmtRes(t)}${t.memo ? ` / メモ: ${t.memo}` : ''}`) : ['- なし']));
+  const qz = (S.quizzes || []).slice(-10);
+  if (qz.length) { lines.push('\n## 最近の小テスト'); qz.forEach(r => lines.push(`- ${r.date} ${subjName(r.subjectId)} ${r.topic || ''}: ${r.correct}/${r.total}`)); }
   return lines.join('\n');
 }
 
@@ -1049,12 +1175,12 @@ async function sendAi(text) {
   aiBusy = true; $('#btnSend').disabled = true;
   chat.push({ role: 'user', content: text.trim() }); saveChat(); renderChat();
   const box = $('#chat'); const pending = document.createElement('div'); pending.className = 'msg assistant'; pending.textContent = '考え中…'; box.appendChild(pending); box.scrollTop = box.scrollHeight;
-  let system = 'あなたは学習者を支えるスタディコーチです。日本語で、結論を先に、具体的かつ実行可能な提案をしてください。時間配分は分単位で示し、無理のない計画にしてください。';
+  let system = 'あなたは学習者を支えるスタディコーチです。日本語で、結論を先に、具体的かつ実行可能な提案をしてください。時間配分は分単位で示し、無理のない計画にしてください。' + aiLen().rule;
   if ($('#aiIncludeData').checked) system += '\n\n以下はユーザーのスタディプランナーに記録された最新データです。\n\n' + buildContext();
-  const history = chat.filter(m => !m.error).slice(-20).map(m => ({ role: m.role, content: m.content }));
+  const history = chat.filter(m => !m.error).slice(-10).map(m => ({ role: m.role, content: m.content }));
   while (history.length && history[0].role !== 'user') history.shift();
   try {
-    const { text: reply, stop } = await callClaude(history, system);
+    const { text: reply, stop } = await callClaude(history, system, aiLen().tokens);
     chat.push({ role: 'assistant', content: (reply || '（応答が空でした）') + (stop === 'max_tokens' ? '\n\n（長さの上限で途中までの回答です。「続けて」と送ると続きを書きます）' : '') });
   } catch (err) {
     chat.push({ role: 'assistant', content: err.message || String(err), error: true });
@@ -1065,6 +1191,144 @@ $('#btnSend').onclick = () => { const v = $('#aiInput').value; $('#aiInput').val
 $('#aiInput').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('#btnSend').click(); } });
 $$('[data-prompt]').forEach(b => b.onclick = () => sendAi(QUICK[b.dataset.prompt]));
 $('#btnClearChat').onclick = () => { if (confirm('会話履歴を消去しますか？')) { chat = []; saveChat(); renderChat(); } };
+
+/* ========== 回答の長さ（トークン節約） ========== */
+const LEN = {
+  short: { tokens: 700, rule: '回答は要点のみ。箇条書き中心で300字以内。前置き・繰り返し・まとめは書かない。' },
+  normal: { tokens: 1400, rule: '回答は簡潔に600字程度まで。前置きは書かない。' },
+  long: { tokens: 3000, rule: '必要な範囲で詳しく。' }
+};
+const aiLen = () => LEN[S.settings.aiLength] || LEN.short;
+$('#aiLength').onchange = e => { S.settings.aiLength = e.target.value; save(); };
+
+/* ========== カレンダー ========== */
+let calMonth = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+let calSel = ymd();
+function renderCalendar() {
+  const y = calMonth.getFullYear(), mo = calMonth.getMonth();
+  $('#calTitle').textContent = `${y}年${mo + 1}月`;
+  const start = addDays(calMonth, -calMonth.getDay());
+  const days = minutesByDay(start, 42);
+  const tests = {}; S.tests.forEach(t => (tests[t.date] ||= []).push(t));
+  const today = ymd();
+  let html = [...'日月火水木金土'].map(w => `<div class="wd">${w}</div>`).join('');
+  for (let i = 0; i < 42; i++) {
+    const d = addDays(start, i), k = ymd(d);
+    if (i === 35 && d.getMonth() !== mo) break;
+    const mins = Object.values(days[k] || {}).reduce((a, b) => a + b, 0);
+    const ts = tests[k] || [];
+    const cls = ['day', d.getMonth() !== mo && 'out', k === today && 'today', ts.length && 'has-test', k === calSel && 'sel'].filter(Boolean).join(' ');
+    html += `<button class="${cls}" data-day="${k}" aria-label="${d.getMonth() + 1}月${d.getDate()}日${ts.length ? ' テストあり' : ''}"><span class="num">${d.getDate()}</span>${ts.map(t => `<span class="t">${esc(t.name)}</span>`).join('')}${mins ? `<span class="m">${fmtMin(mins).replace('時間', 'h').replace('分', 'm')}</span><span class="bar" style="width:${Math.min(100, mins / Math.max(1, S.settings.dailyGoal || 120) * 100)}%"></span>` : ''}</button>`;
+  }
+  $('#cal').innerHTML = html;
+  const ts = tests[calSel] || [];
+  const ss = S.sessions.filter(s => s.date === calSel);
+  $('#calDetail').innerHTML = `<div class="row"><b class="grow">${fmtDateJa(calSel)}</b><button class="small" id="calAddTest">この日にテストを追加</button></div>
+    <ul class="list">${ts.map(t => `<li><span class="countdown${daysUntil(t.date) <= 7 && t.date >= today ? ' soon' : ''}">${esc(t.name)}</span><span class="grow muted">${(t.results || []).map(r => esc(subjName(r.subjectId))).join('・')}</span><button class="small" data-edit-test="${t.id}">編集</button></li>`).join('')}
+    ${ss.map(s => `<li><span class="dot" style="background:${esc(subjColor(s.subjectId))}"></span><span class="grow">${esc(s.bookId && bookById(s.bookId) ? bookById(s.bookId).title : subjName(s.subjectId))}</span><b>${fmtMin(s.minutes)}</b></li>`).join('')}
+    ${!ts.length && !ss.length ? '<li class="empty">予定・記録はありません</li>' : ''}</ul>`;
+  $('#calAddTest').onclick = () => { openTestDialog(null); $('#tsDate').value = calSel; };
+}
+$('#cal').addEventListener('click', e => { const d = e.target.closest('[data-day]'); if (d) { calSel = d.dataset.day; const dd = parseYmd(calSel); if (dd.getMonth() !== calMonth.getMonth()) calMonth = new Date(dd.getFullYear(), dd.getMonth(), 1); renderCalendar(); } });
+$('#calPrev').onclick = () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); renderCalendar(); };
+$('#calNext').onclick = () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1); renderCalendar(); };
+$('#calToday').onclick = () => { const d = new Date(); calMonth = new Date(d.getFullYear(), d.getMonth(), 1); calSel = ymd(); renderCalendar(); };
+
+/* ========== 小テスト・解説 ========== */
+let quiz = null; // {subjectId, bookId, topic, level, questions:[{q,choices,answer,explanation}], picks:[], graded, more:{}}
+function renderQuizSetup() {
+  const qs = $('#qzSubject'), cur = qs.value;
+  qs.innerHTML = subjectOptions(cur); if (cur) qs.value = cur;
+  const qb = $('#qzBook'), curB = qb.value;
+  qb.innerHTML = '<option value="">指定しない</option>' + S.books.filter(b => b.subjectId === qs.value).map(b => `<option value="${b.id}">${esc(b.title)}</option>`).join('');
+  qb.value = [...qb.options].some(o => o.value === curB) ? curB : '';
+  const h = [...(S.quizzes || [])].reverse().slice(0, 20);
+  $('#quizHistory').innerHTML = h.length ? h.map(r => `<li><span class="dot" style="background:${esc(subjColor(r.subjectId))}"></span><div class="grow"><div>${esc(subjName(r.subjectId))}　${esc(r.topic || '範囲指定なし')}</div><div class="muted">${fmtDateJa(r.date)}・${esc(r.level)}</div></div><span class="countdown">${r.correct}/${r.total}</span><button class="small" data-quiz-retry="${r.id}">解き直す</button></li>`).join('')
+    : '<li class="empty">まだ小テストを解いていません。上で範囲を決めて作成できます。</li>';
+}
+$('#qzSubject').onchange = renderQuizSetup;
+
+function parseJsonLoose(text) {
+  const a = text.indexOf('{'), b = text.lastIndexOf('}');
+  if (a < 0 || b < a) throw new Error('問題の形式を読み取れませんでした。もう一度お試しください。');
+  return JSON.parse(text.slice(a, b + 1));
+}
+$('#btnQuizMake').onclick = async () => {
+  const subjectId = $('#qzSubject').value, bookId = $('#qzBook').value || null;
+  if (!subjectId) return toast('教科を選んでください');
+  const n = Number($('#qzCount').value), level = $('#qzLevel').value, topic = $('#qzTopic').value.trim();
+  const book = bookId ? bookById(bookId) : null;
+  const btn = $('#btnQuizMake'); btn.disabled = true; btn.textContent = '作成中…';
+  const system = 'あなたは日本の学校の先生です。指定どおりの4択問題をJSONだけで出力してください。説明文やコードブロックは不要です。' +
+    '形式: {"questions":[{"q":"問題文","choices":["選択肢1","選択肢2","選択肢3","選択肢4"],"answer":正解の添字0-3,"explanation":"60字以内の解説"}]}。' +
+    '正解の位置は偏らせない。事実誤認のない問題にする。';
+  const user = `教科: ${subjName(subjectId)}\n${book ? `教材: ${book.title}\n` : ''}範囲・テーマ: ${topic || '教科の重要事項から'}\n難易度: ${level}\n問題数: ${n}`;
+  try {
+    const { text } = await callClaude([{ role: 'user', content: user }], system, 220 * n + 200);
+    const j = parseJsonLoose(text);
+    const qs = (j.questions || []).filter(q => q && q.q && Array.isArray(q.choices) && q.choices.length >= 2 && Number.isInteger(q.answer) && q.answer < q.choices.length);
+    if (!qs.length) throw new Error('問題を作成できませんでした。範囲を具体的にして再度お試しください。');
+    quiz = { subjectId, bookId, topic, level, questions: qs, picks: [], graded: false, more: {} };
+    renderQuiz(); $('#quizBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) { alert(err.message); }
+  finally { btn.disabled = false; btn.textContent = '問題を作る'; }
+};
+function renderQuiz() {
+  const box = $('#quizBox');
+  box.hidden = !quiz; $('#quizSetup').hidden = !!quiz;
+  if (!quiz) return;
+  $('#quizTitle').textContent = `${subjName(quiz.subjectId)}　${quiz.topic || ''}`;
+  const correct = quiz.questions.filter((q, i) => quiz.picks[i] === q.answer).length;
+  $('#quizResult').innerHTML = quiz.graded ? `<div class="score-big">${correct} / ${quiz.questions.length}</div>` : '';
+  $('#quizQs').innerHTML = quiz.questions.map((q, i) => {
+    const pick = quiz.picks[i], ok = pick === q.answer;
+    const mark = quiz.graded ? `<span class="grade" aria-label="${ok ? '正解' : '不正解'}">${ok ? '○' : '✓'}</span>` : '';
+    return `<div class="q"><div class="qt"><span class="qn">${i + 1}${mark}</span><div class="grow">${esc(q.q)}</div></div>
+      ${q.choices.map((c, k) => `<button class="choice${quiz.graded && k === q.answer ? ' correct' : ''}" data-q="${i}" data-c="${k}" ${quiz.graded ? 'disabled' : ''}><span class="mark${pick === k ? ' on' : ''}">${k + 1}</span>${esc(c)}</button>`).join('')}
+      ${quiz.graded ? `<div class="expl">${esc(q.explanation || '')}${quiz.more[i] ? `<div style="margin-top:6px">${mdLite(quiz.more[i])}</div>` : `<div style="margin-top:6px"><button class="small" data-more="${i}">くわしく解説</button></div>`}</div>` : ''}</div>`;
+  }).join('');
+  $('#btnQuizGrade').textContent = quiz.graded ? 'もう一度作る' : '採点する';
+}
+$('#quizQs').addEventListener('click', async e => {
+  const c = e.target.closest('[data-c]');
+  if (c && !quiz.graded) { quiz.picks[+c.dataset.q] = +c.dataset.c; renderQuiz(); return; }
+  const m = e.target.closest('[data-more]');
+  if (m) {
+    const i = +m.dataset.more, q = quiz.questions[i];
+    m.disabled = true; m.textContent = '解説を作成中…';
+    try {
+      const { text } = await callClaude([{ role: 'user', content: `問題: ${q.q}\n選択肢: ${q.choices.map((c, k) => `${k + 1}. ${c}`).join(' / ')}\n正解: ${q.answer + 1}\n私の解答: ${quiz.picks[i] != null ? quiz.picks[i] + 1 : '無回答'}\nこの問題を解説してください。` }],
+        `あなたは家庭教師です。正解の理由と、誤答の選択肢がなぜ違うかを示してください。${aiLen().rule}`, aiLen().tokens);
+      quiz.more[i] = text; renderQuiz();
+    } catch (err) { alert(err.message); m.disabled = false; m.textContent = 'くわしく解説'; }
+  }
+});
+$('#btnQuizGrade').onclick = () => {
+  if (quiz.graded) { quiz = null; renderQuiz(); renderQuizSetup(); return; }
+  const blank = quiz.questions.length - quiz.picks.filter(p => p != null).length;
+  if (blank && !confirm(`未回答が${blank}問あります。採点しますか？`)) return;
+  quiz.graded = true;
+  const correct = quiz.questions.filter((q, i) => quiz.picks[i] === q.answer).length;
+  (S.quizzes ||= []).push({ id: uid(), date: ymd(), subjectId: quiz.subjectId, bookId: quiz.bookId, topic: quiz.topic, level: quiz.level, total: quiz.questions.length, correct, questions: quiz.questions });
+  if (S.quizzes.length > 100) S.quizzes = S.quizzes.slice(-100);
+  save(); renderQuiz(); renderQuizSetup(); window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+$('#btnQuizClose').onclick = () => { if (quiz.graded || confirm('解答中の小テストを閉じますか？')) { quiz = null; renderQuiz(); } };
+document.addEventListener('click', e => {
+  const r = e.target.closest('[data-quiz-retry]'); if (!r) return;
+  const h = S.quizzes.find(x => x.id === r.dataset.quizRetry); if (!h) return;
+  quiz = { subjectId: h.subjectId, bookId: h.bookId, topic: h.topic, level: h.level, questions: h.questions, picks: [], graded: false, more: {} };
+  renderQuiz(); window.scrollTo({ top: 0 });
+});
+$('#btnExplain').onclick = async () => {
+  const q = $('#explInput').value.trim(); if (!q) return toast('解説してほしい内容を入力してください');
+  const b = $('#btnExplain'); b.disabled = true; b.textContent = '解説を作成中…';
+  try {
+    const { text } = await callClaude([{ role: 'user', content: q }], `あなたは家庭教師です。学習者の質問を、わかりやすく正確に解説してください。${aiLen().rule}`, aiLen().tokens);
+    $('#explOut').innerHTML = `<div class="msg assistant" style="margin-top:10px">${mdLite(text)}</div>`;
+  } catch (err) { $('#explOut').innerHTML = `<div class="msg error" style="margin-top:10px">${esc(err.message)}</div>`; }
+  finally { b.disabled = false; b.textContent = '解説する'; }
+};
 
 /* ========== 設定 ========== */
 function saveKeySettings() {
